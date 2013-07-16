@@ -118,10 +118,11 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                 nfeat -= 1 
             if nfeat < 1:
                 raise ValueError("The feature number is invalid! It should be at least at One")
-            tmp = range(0,nfeat)
-            self.featnames = np.array(tmp,str)  
+            tmp = []
             for i in range(0,nfeat):
-                self.featnames[i] = "feature %d"%i
+                tmp.append('feature_%d'%i)
+
+            self.featnames = np.array(tmp,str)  
 
         keys = [[]]*np.size(data,1)
         numdata = -1*np.ones_like(data);
@@ -143,17 +144,29 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
 
         self.nfeatures=[0]
         lbin = LabelBinarizer();
+        self.unique_feats=[]
 
         for k in range(np.size(xdata,1)): # loop thru number of columns in xdata
             if k==0:
                 xdata_ml = lbin.fit_transform(xdata[:,k]);
+                if len(lbin.classes_) == 2:
+                    xdata_ml = np.concatenate((1 - xdata_ml, xdata_ml), axis=1)
+                if len(lbin.classes_) == 1:
+                    self.unique_feats.append(self.nfeatures[-1])
                 self.featIndex = lbin.classes_
+                    
                 self.nfeatures.append(len(lbin.classes_))
             else:
-                xdata_ml = np.hstack((xdata_ml,lbin.fit_transform(xdata[:,k])))
+                cur_xdata_ml=lbin.fit_transform(xdata[:,k])
+                if len(lbin.classes_) == 2:
+                    cur_xdata_ml = np.concatenate((1 - cur_xdata_ml, cur_xdata_ml), axis=1)
+                if len(lbin.classes_) == 1:
+                    self.unique_feats.append(self.nfeatures[-1])
+                xdata_ml = np.hstack((xdata_ml,cur_xdata_ml))
                 self.featIndex= np.hstack((self.featIndex,lbin.classes_))
                 self.nfeatures.append(self.nfeatures[-1]+len(lbin.classes_))
     
+        #print self.unique_feats
         if _labeled:
             return xdata_ml,ydata
         else:
@@ -199,16 +212,23 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
 
         
 
-
+    """
+    This is very delicate
+    """
     def inverse_transform(self,xdata_ml):
         numrows = np.size(xdata_ml,0)
         if(len(xdata_ml.shape) > 1):
             featIndex_t=np.tile(self.featIndex,(numrows,1))
             xdata_nz = (xdata_ml == 1)
+            for j in self.unique_feats:
+                xdata_nz[:,j]=True
+            
             res = np.extract(xdata_nz,featIndex_t).reshape(numrows,-1)
             return res
         else:
             xdata_ml2=np.atleast_2d(xdata_ml)
+            for j in self.unique_feats:
+                xdata_ml2[0][j]=1
             featIndex_t=np.atleast_2d(self.featIndex)
             return featIndex_t[:,np.nonzero(xdata_ml2)[1]]
 
@@ -217,8 +237,8 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     Parameters:
         jll: 
             type: numpy array; shape: [nclass_,nbinaryfeature_]
-        classArray:
-            type: list; format: for each row of jll, item indexes from classArray[i] to classArray[i+1](exclusive) is 
+        featArray:
+            type: list; format: for each row of jll, item indexes from featArray[i] to featArray[i+1](exclusive) is 
             the binary result of fiture i
     Return:
         LCT table:
@@ -226,26 +246,26 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     """
     def calCPT(self):
         jll = self.feature_log_prob_
-        classArray = self.nfeatures
+        featArray = self.nfeatures
 
         nClass  =np.size(jll,0)
         nFeature=np.size(jll,1)
 
-        ori_nFeature=len(classArray)-1
+        ori_nFeature=len(featArray)-1
         if self._verbose:    
             print "nFeature: %d; nClass: %d; ori_nFeature: %d"%(nFeature,nClass,ori_nFeature)
-        if ori_nFeature < 1 or nFeature != classArray[-1]:
-            raise ValueError("the dimension of given jll: %d * %d is inconsistent with info of classArray: %d!"%(nFeature, nClass,classArray[-1]))
+        if ori_nFeature < 1 or nFeature != featArray[-1]:
+            raise ValueError("the dimension of given jll: %d * %d is inconsistent with info of featArray: %s!"%(nClass, nFeature,str(featArray)))
             return None
 
-        nclassArray=classArray-np.roll(classArray,1)
-        max_nClass=np.amax(nclassArray[1:])
+        nfeatArray=featArray-np.roll(featArray,1)
+        max_nClass=np.amax(nfeatArray[1:])
         self.cpt=np.zeros((nClass,ori_nFeature,max_nClass))
         for i in range(0,nClass):
             for j in range(0,ori_nFeature):
-                sumij=logsumexp(jll[i,classArray[j]:classArray[j+1]])
-                for k in range(classArray[j],classArray[j+1]):
-                    self.cpt[i,j,k-classArray[j]]=jll[i,k]-sumij
+                sumij=logsumexp(jll[i,featArray[j]:featArray[j+1]])
+                for k in range(featArray[j],featArray[j+1]):
+                    self.cpt[i,j,k-featArray[j]]=jll[i,k]-sumij
         self.cpt=np.exp(self.cpt)
 
     def outputCPT(self,out=None):
@@ -329,18 +349,8 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         for i in range(0,numrows):
             onerow=""
             onerow_hu=""
-            #print "xdata_ml[%d]:"%i
-            #print xdata_ml[i]
-            #print "xdata_ori[%d]:"%i
-            #print xdata_ori[i]
             for j in range(0,len(xdata_ori[i])):
                 item = xdata_ori[i][j]
-                #print "j"
-                #print j
-                #print "item"
-                #print item
-                #print "xkeys"
-                #print self.xkeys[i]
                 onerow+="%d,"%item
                 onerow_hu+="%s,"%self.xkeys[j][item]
             onerow+="%d,%d"%(ypredict[i],ydata[i])
@@ -403,10 +413,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
         BaseMultinomialNBEM.__init__(self,alpha,fit_prior,class_prior)
 
-    def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False):
+    def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False,ydata=None):
         if n_cluster <=1:
             raise ValueError("Please input a maximum cluster number no smaller than 1")
-        if iterCN<=0:
+        if iterCN<0:
             raise ValueError("Please input a strict positive integer value for iteration number of EM method")
         if iterSN<=0:
             raise ValueError("Please input a strict positive integer value for retrial number of EM method")
@@ -445,6 +455,8 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             else:
                 raise ValueError("Ah I don't know this initial method: %d"%initMethod)
         #initial
+            if ydata!=None:
+                ytrain=ydata
             self.fit(xtrain,ytrain,class_prior=self.class_prior);
 
             old_sigma_yx=np.array(np.zeros((numrows,numc)),float)
@@ -478,11 +490,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
             if final_log_prob > bestlog_prob:
                 if self.outputDir or self._verbose:
-                    if i%10 ==0 or i > self.iterCN-5:
-                        if self._verbose:
-                            print "%d,%d,%d,%f,%f,%f,Better LL and NO Conflict"%(numc,j+1,iterCN,final_log_prob,diff,bestlog_prob)
-                        if self.outputDir:
-                            print >>log,"%d,%d,%d,%f,%f,%f,Better LL and NO Conflict"%(numc,j+1,iterCN,final_log_prob,diff,bestlog_prob)
+                    if self._verbose:
+                        print "%d,%d,%d,%f,%f,%f,Better LL and NO Conflict"%(numc,j+1,iterCN,final_log_prob,diff,bestlog_prob)
+                    if self.outputDir:
+                        print >>log,"%d,%d,%d,%f,%f,%f,Better LL and NO Conflict"%(numc,j+1,iterCN,final_log_prob,diff,bestlog_prob)
 
                 bestlog_prob = final_log_prob
                 best_iter = j
