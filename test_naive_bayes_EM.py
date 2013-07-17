@@ -31,6 +31,7 @@ def usage():
                                      initial_method: an integer specifying the initial method 
                                      0: uniform initialization
                                      1: k points methods. Refer to PHAM2009 'Unsupervised training of bayesian networks for data clustering'"""
+    print "    [-a]: set default attributes information"
 
 
 def main(argv):
@@ -48,6 +49,7 @@ def main(argv):
     global LTYPE
     global OUTPUTDIR 
     global LOGDIR 
+    global DATAPATHS
     initMethod = 0
     _PARTITION = False
     _attr = False
@@ -83,10 +85,14 @@ def main(argv):
 
     if LTYPE == 0:
         random.seed()
-        if args !="":
+        if len(args) > 0:
             DATAPATHS = args
-        rdata = random_gen(DATAPATHS,ratios='10:5:1:1',_random=True)
-        nbem=naive_bayes_EM.MultinomialNBEM()
+        rdata = random_gen(DATAPATHS,_random=True)
+        out_rdata = open('rdata.csv','w')
+        writer = csv.writer(out_rdata)
+        writer.writerows(rdata)
+        out_rdata.close()
+        nbem=naive_bayes_EM.MultinomialNBEM(alpha=2.0)
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
             nbem.setOutput(OUTPUTDIR)
@@ -95,8 +101,14 @@ def main(argv):
         else:
             xdata_ml,ydata=nbem.fit_transformRaw(rdata,True)
             
-        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE,ydata)
+        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE)
         nbem.testModel(xdata_ml,ydata,_DATE)
+        out_proba = open('predict_prob','w')
+        res = nbem.predict_proba(xdata_ml)
+        for item in res:
+            print >>out_proba,item
+        #print >>out_proba,nbem.feature_log_prob_
+        out_proba.close()
     else:
         raise ValueError("Oh I just know NBEM. The corresponding LTYPE is 0")
             
