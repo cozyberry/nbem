@@ -518,11 +518,16 @@ class MultinomialNBEM(BaseMultinomialNBEM):
     """
     Attention: xtrain should be in well transformed format
     """
-    def calcObj(self,xtrain):
+    def calcObj(self,xtrain,obj='ML'):
         jll = self._joint_log_likelihood(xtrain)
         # normalize by P(x) = P(f_1, ..., f_n)
         log_prob_x = logsumexp(jll, axis=1)
         log_prob = np.sum(log_prob_x,axis=0)
-        return log_prob
+        if obj == 'ML':
+            return log_prob
+        elif obj == 'MAP':
+            log_theta = np.sum(self.class_log_prior_)+np.sum(self.feature_log_prob_)
+            log_prob = log_prob+(self.alpha-1)*log_theta
+            return log_prob
 
 
