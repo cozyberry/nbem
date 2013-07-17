@@ -3,6 +3,7 @@
 from sklearn.preprocessing import LabelBinarizer
 from sklearn import naive_bayes
 from sklearn import metrics
+from sklearn import cluster
 import numpy as np
 from numpy import linalg as LA
 from sklearn.utils.extmath import safe_sparse_dot, logsumexp
@@ -85,7 +86,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
         naive_bayes.MultinomialNB.__init__(self,alpha,fit_prior,class_prior)
         self._verbose = False
-        self.outputdir = None 
+        self.outputDir = None 
         if fit_prior == True and class_prior:
             print "The fit_prior and class_prior are both set as True. We will use the assigned class_prior and the fit_prior will be ignored"
 
@@ -172,7 +173,27 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         else:
             return xdata_ml
 
-    def uniform_init(self,xdata_ml):
+    def uniform_init_theta(self,xdata_ml):
+        np.random.seed()
+        dim = self.n_cluster+np.size(xdata_ml,1)*self.n_cluster
+        array_alpha = np.ones(dim)*self.alpha
+        itheta = np.random.dirichlet(array_alpha,1).transpose()
+        #self.class_log_prior_ = np.ndarray(shape=(self.n_cluster,),dtype=float)
+        for i in range(0,self.n_cluster):
+            self.class_log_prior_=itheta[i,0]
+        #self.feature_log_prob_= np.ndarray(shape=(self.n_cluster,np.size(xdata_ml,1)),dtype=float)
+        for i in range(0,self.n_cluster):
+            for j in range(0,np.size(xdata_ml,1)):
+                self.feature_log_prob_[i,j] = itheta[self.n_cluster+np.size(xdata_ml,1)*i+j,0]
+
+
+    def kmeans_init(self,xdata_ml):
+        k_means = cluster.KMeans(n_clusters=self.n_cluster)
+        k_means.fit(xdata_ml)
+        ypredict = k_means.labels_
+        return ypredict
+
+    def uniform_init_from_data(self,xdata_ml):
         numc = self.n_cluster
         random.seed()
         numrows = np.size(xdata_ml,0)
@@ -307,7 +328,8 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                 print "Ah not call self.setoutput yet. I will use current directory"
                 OUTPUTDIR = "./"
 
-        curnumc = len(self.classes_)
+        #curnumc = len(self.classes_)
+        curnumc = np.size(self.feature_log_prob_,0)
         numrows = np.size(xdata_ml,0)
         ypredict = self.predict(xdata_ml)
         numc = len(ykeys)
@@ -431,7 +453,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         if self._verbose:
             print "NO_Class,NO_Trial,NO_ITER,LL,DIFF_CPT,YET_CUR_BEST_LL,Comments"
 
-        if self.outputDir:
+        if self.outputDir!=None:
             prefix="log_nbem"
             outputDate=strftime("%m%d%H%M%S",localtime())
             if timestamp:
@@ -440,7 +462,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 logname="%s_i%d_r%d_n%d_k%d.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
 
             log=open(os.path.join(self.outputDir,logname),'w')    
-            print >>log,"NO_Class,NO_Trial,NO_ITER,LL,DIFF_CPT,YET_CUR_BEST_LL,Comments"
+            print >>log,"NO_Class,NO_Trial,NO_ITER,LL,DIFF_LL,DIFF_CPT,YET_CUR_BEST_LL,Comments"
 
         bestlog_prob = -float('inf') 
         best_iter = 0
@@ -449,18 +471,32 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         for j in range(0,self.iterSN):
         #Initializing step of target
             if initMethod == 0:
-                ytrain=self.uniform_init(xtrain)
+                ytrain=self.uniform_init_from_data(xtrain)
+                if ydata!=None:
+                    ytrain=ydata
+                self.fit(xtrain,ytrain,class_prior=self.class_prior);
             elif initMethod == 1:
                 ytrain=self.k_points_init(xtrain)
+                if ydata!=None:
+                    ytrain=ydata
+                self.fit(xtrain,ytrain,class_prior=self.class_prior);
+            elif initMethod == 2:
+                #The following 2 lines take no effect in fact
+                ytrain=self.k_points_init(xtrain)
+                self.fit(xtrain,ytrain,class_prior=self.class_prior);
+
+                self.uniform_init_theta(xtrain)
+            elif initMethod == 3:
+                ytrain=self.kmeans_init(xtrain)
+                if ydata!=None:
+                    ytrain=ydata
+                self.fit(xtrain,ytrain,class_prior=self.class_prior);
             else:
                 raise ValueError("Ah I don't know this initial method: %d"%initMethod)
         #initial
-            if ydata!=None:
-                ytrain=ydata
-            self.fit(xtrain,ytrain,class_prior=self.class_prior);
-
             old_sigma_yx=np.array(np.zeros((numrows,numc)),float)
             diff = 10000.0
+            old_log_prob = 0.0
             for i in range(0,iterCN):
             #E-step
                 sigma_yx=self.predict_proba(xtrain)
@@ -483,13 +519,15 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 self.feature_log_prob_=np.log(qxy)
 # I am stopped here
                 if self.outputDir or self._verbose:
-                    #if i%5 ==0 or i > self.iterCN-5:
-                    if i < self.iterCN:
+                    if i%10 ==0 or i > self.iterCN-5:
+                    #if i < self.iterCN:
                         log_prob=self.calcObj(xtrain)
                         if self._verbose:
-                            print "%d,%d,%d,%f,%f,%f,Still in CN Loop"%(numc,j+1,i+1,log_prob,diff,bestlog_prob)
+                            print "%d,%d,%d,%f,%f,%f,%f,Still in CN Loop"%(numc,j+1,i+1,log_prob,log_prob-old_log_prob,diff,bestlog_prob)
                         if self.outputDir:
-                            print >>log,"%d,%d,%d,%f,%f,%f,Still in CN Loop"%(numc,j+1,i+1,log_prob,diff,bestlog_prob)
+                            print >>log,"%d,%d,%d,%f,%f,%f,%f,Still in CN Loop"%(numc,j+1,i+1,log_prob,log_prob-old_log_prob,diff,bestlog_prob)
+
+                        old_log_prob = log_prob
 
 
             final_log_prob = self.calcObj(xtrain)
@@ -510,9 +548,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
         self.class_log_prior_=copy.deepcopy(best_class_log_prior)
         self.feature_log_prob_=copy.deepcopy(best_feature_log_prob)
-        if self._verbose:
-            print "Best one is at %dth iteration"%best_iter
-            print "The corresponding log_prob: ", bestlog_prob
+        #if self._verbose:
+        print "Best one is at %dth iteration"%best_iter
+        print "The corresponding log_prob: ", bestlog_prob
+
         if self.outputDir:
             print >>log,"Best one is at %dth iteration"%best_iter
             print >>log,"The corresponding log_prob: ", bestlog_prob
