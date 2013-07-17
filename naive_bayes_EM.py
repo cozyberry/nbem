@@ -468,17 +468,23 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 diff=LA.norm(diff_sig)
                 old_sigma_yx=sigma_yx
             #M-step
-                q_y=np.sum(sigma_yx,axis=0)/numrows 
+                #q_y=np.sum(sigma_yx,axis=0)/numrows 
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1
+                q = np.sum(q_y)
+                q_y = np.divide(q_y,q) 
                 self.class_log_prior_=np.log(q_y)
+
                 #alpha is very import to smooth. or else in log when the proba is too small we got -inf
                 #ncx = safe_sparse_dot(sigma_yx.T, xtrain)+mnb.alpha
-                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha
+                ######MAP###########################################
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
 # I am stopped here
                 if self.outputDir or self._verbose:
-                    if i%10 ==0 or i > self.iterCN-5:
+                    #if i%5 ==0 or i > self.iterCN-5:
+                    if i < self.iterCN:
                         log_prob=self.calcObj(xtrain)
                         if self._verbose:
                             print "%d,%d,%d,%f,%f,%f,Still in CN Loop"%(numc,j+1,i+1,log_prob,diff,bestlog_prob)
@@ -518,7 +524,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
     """
     Attention: xtrain should be in well transformed format
     """
-    def calcObj(self,xtrain,obj='ML'):
+    def calcObj(self,xtrain,obj='MAP'):
         jll = self._joint_log_likelihood(xtrain)
         # normalize by P(x) = P(f_1, ..., f_n)
         log_prob_x = logsumexp(jll, axis=1)
