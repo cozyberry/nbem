@@ -13,6 +13,7 @@ from time import localtime, strftime, time
 import itertools
 import random
 import copy
+import pprint
 from scipy import special
 
 class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
@@ -165,7 +166,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                     cur_xdata_ml = np.concatenate((1 - cur_xdata_ml, cur_xdata_ml), axis=1)
                 if len(lbin.classes_) == 1:
                     self.unique_feats.append(self.nfeatures[-1])
-                    cur_xdata_ml = 1-cur_xdata
+                    cur_xdata_ml = 1-cur_xdata_ml
                 xdata_ml = np.hstack((xdata_ml,cur_xdata_ml))
                 self.featIndex= np.hstack((self.featIndex,lbin.classes_))
                 self.nfeatures.append(self.nfeatures[-1]+len(lbin.classes_))
@@ -291,6 +292,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                 for k in range(featArray[j],featArray[j+1]):
                     self.cpt[i,j,k-featArray[j]]=jll[i,k]-sumij
         self.cpt=np.exp(self.cpt)
+
 
     def outputCPT(self,out=None):
         if out == None:
@@ -441,7 +443,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         BaseMultinomialNBEM.__init__(self,alpha,fit_prior,class_prior)
 
     def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False,ydata=None):
-        if n_cluster <=1:
+        if n_cluster <1:
             raise ValueError("Please input a maximum cluster number no smaller than 1")
         if iterCN<0:
             raise ValueError("Please input a strict positive integer value for iteration number of EM method")
@@ -453,8 +455,11 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         self.iterSN = iterSN
         self.init =initMethod
 
+        self.d=self.n_cluster-1+self.n_cluster*(self.nfeatures[-1]-len(self.nfeatures)+1)
+
         numrows = np.size(xtrain,0)
         numc = self.n_cluster
+
         if self._verbose:
             print "NO_Class,NO_Trial,NO_ITER,LL,DIFF_CPT,YET_CUR_BEST_LL,Comments"
 
@@ -474,6 +479,20 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         best_class_prior = None 
         best_feature_log_prob = None
         for j in range(0,self.iterSN):
+            if numc == 1:
+                self.classes_=np.array([1],int)
+                sigma_yx=np.ones((numrows,1),float)
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1
+                q = np.sum(q_y)
+                q_y = np.divide(q_y,q) 
+                self.class_log_prior_=np.log(q_y)
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1
+                ncxsum=np.sum(ncx,axis=1)
+                qxy=np.divide(ncx.T,ncxsum).T
+                self.feature_log_prob_=np.log(qxy)
+                self.iterSN = 1
+                self.iterCN = 0
+                initMethod = -1
         #Initializing step of target
             if initMethod == 0:
                 ytrain=self.uniform_init_from_data(xtrain)
@@ -496,13 +515,15 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 if ydata!=None:
                     ytrain=ydata
                 self.fit(xtrain,ytrain,class_prior=self.class_prior);
+            elif initMethod == -1:
+                pass
             else:
                 raise ValueError("Ah I don't know this initial method: %d"%initMethod)
-        #initial
+        #initial difference
             old_sigma_yx=np.array(np.zeros((numrows,numc)),float)
             diff = 10000.0
             old_log_prob = 0.0
-            for i in range(0,iterCN):
+            for i in range(0,self.iterCN):
             #E-step
                 sigma_yx=self.predict_proba(xtrain)
                 diff_sig=sigma_yx-old_sigma_yx
@@ -564,6 +585,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
         self.calCPT()
         print "BIC: %f"%self.BIC(xtrain)
+        print "Cheeseman_Stutz_Score: %f"%self.cheeseman_stutz_score(xtrain)
 
 
     """
@@ -583,20 +605,61 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
     def BIC(self,xtest):
         ll=self.calcObj(xtest,obj='ML')
-        return ll-0.5*(self.n_cluster-1+self.n_cluster*(self.nfeatures[-1]-len(self.nfeatures)+1))*np.log(np.size(xtest,0))
+        return ll-0.5*self.d*np.log(np.size(xtest,0))
+
 
     def get_sufficient_stats(self,xtest):
-        sigma_yx=self.predict_proba(xtest)
-        self.expect_nclass=np.sum(sigma_yx,axis=0)
+        sigma_yx = self.predict_proba(xtest)
+        self.expect_nclass = np.sum(sigma_yx,axis=0)
+        self.expect_nclass_feature = safe_sparse_dot(sigma_yx.T, xtest)
+        """
+        for i in range(0,len(self.nfeatures)-1):
+            if i == 0:
+                self.sum_expect_nclass_feature = np.sum(self.expect_nclass_feature[:,self.nfeatures[i]:self.nfeatures[i+1]],axis=1)
+            else:
+                self.sum_expect_nclass_feature = np.hstack((self.sum_expect_nclass_feature,np.sum(self.expect_nclass_feature[:,self.nfeatures[i]:self.nfeatures[i+1]],axis=1)))
+        print self.expect_nclass
+        print self.expect_nclass_feature
+        print np.sum(self.expect_nclass)
+        print self.sum_expect_nclass_feature
+        """
 
+    def complete_model_ML(self):
+        gamma_nclass=special.gammaln(self.expect_nclass+self.alpha)
+        gamma_nclass_feature=special.gammaln(self.expect_nclass_feature+self.alpha)
+        gamma_sum_nclass=special.gammaln(np.sum(self.expect_nclass+self.alpha))
+        nFeature=len(self.nfeatures)-1
+        for i in range(0,nFeature):
+            cur_gamma_sum_nclass_feature=special.gammaln(np.sum(self.expect_nclass_feature[:,self.nfeatures[i]:self.nfeatures[i+1]]+self.alpha,axis=1))
+            if i==0:
+                gamma_sum_nclass_feature=cur_gamma_sum_nclass_feature
+            else:
+                gamma_sum_nclass_feature=np.hstack((gamma_sum_nclass_feature,cur_gamma_sum_nclass_feature))
+
+
+        #pprint.pprint(locals())
+        nparams=self.n_cluster+self.n_cluster*(self.nfeatures[-1])
         
-    def complete_ML(self):
+        gamma_sum_alpha=special.gammaln(self.n_cluster*self.alpha)
+        for i in range(0,nFeature):
+            gamma_sum_alpha+=self.n_cluster*special.gammaln(self.alpha*(self.nfeatures[i+1]-self.nfeatures[i]))
+
+        return np.sum(gamma_nclass_feature)+np.sum(gamma_nclass)-np.sum(gamma_sum_nclass_feature)-gamma_sum_nclass+gamma_sum_alpha-nparams*special.gammaln(self.alpha)
+
+    def complete_param_ML(self):
+        part1=np.multiply(self.expect_nclass,self.class_log_prior_)
+        part2=np.multiply(self.expect_nclass_feature,self.feature_log_prob_)
+        return np.sum(part1)+np.sum(part2)
+        #return np.multiply(self.expect_nclass,self.class_log_prior_)+np.multiply(self.expect_nclass_feature,self.feature_log_prob_)
 
 
-    def maximum_likelihood_c(self,xtest):
-        logP_D1_M
-        logP_D1_theta_M
-        logP_D_theta_M
+
+
+    def cheeseman_stutz_score(self,xtest):
+        self.get_sufficient_stats(xtest)
+        logP_D1_M = self.complete_model_ML()
+        logP_D1_theta_M = self.complete_param_ML()
+        logP_D_theta_M = self.calcObj(xtest,obj='ML')
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 
 
