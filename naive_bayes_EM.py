@@ -13,6 +13,7 @@ from time import localtime, strftime, time
 import itertools
 import random
 import copy
+from scipy import special
 
 class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     """
@@ -153,6 +154,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                 if len(lbin.classes_) == 2:
                     xdata_ml = np.concatenate((1 - xdata_ml, xdata_ml), axis=1)
                 if len(lbin.classes_) == 1:
+                    xdata_ml = 1-xdata_ml
                     self.unique_feats.append(self.nfeatures[-1])
                 self.featIndex = lbin.classes_
                     
@@ -163,6 +165,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                     cur_xdata_ml = np.concatenate((1 - cur_xdata_ml, cur_xdata_ml), axis=1)
                 if len(lbin.classes_) == 1:
                     self.unique_feats.append(self.nfeatures[-1])
+                    cur_xdata_ml = 1-cur_xdata
                 xdata_ml = np.hstack((xdata_ml,cur_xdata_ml))
                 self.featIndex= np.hstack((self.featIndex,lbin.classes_))
                 self.nfeatures.append(self.nfeatures[-1]+len(lbin.classes_))
@@ -431,6 +434,8 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
 
         print >>out,""
 
+    
+
 class MultinomialNBEM(BaseMultinomialNBEM):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
         BaseMultinomialNBEM.__init__(self,alpha,fit_prior,class_prior)
@@ -548,7 +553,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
         self.class_log_prior_=copy.deepcopy(best_class_log_prior)
         self.feature_log_prob_=copy.deepcopy(best_feature_log_prob)
-        #if self._verbose:
+
         print "Best one is at %dth iteration"%best_iter
         print "The corresponding log_prob: ", bestlog_prob
 
@@ -558,6 +563,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             log.close()
 
         self.calCPT()
+        print "BIC: %f"%self.BIC(xtrain)
 
 
     """
@@ -574,5 +580,25 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             log_theta = np.sum(self.class_log_prior_)+np.sum(self.feature_log_prob_)
             log_prob = log_prob+(self.alpha-1)*log_theta
             return log_prob
+
+    def BIC(self,xtest):
+        ll=self.calcObj(xtest,obj='ML')
+        return ll-0.5*(self.n_cluster-1+self.n_cluster*(self.nfeatures[-1]-len(self.nfeatures)+1))*np.log(np.size(xtest,0))
+
+    def get_sufficient_stats(self,xtest):
+        sigma_yx=self.predict_proba(xtest)
+        self.expect_nclass=np.sum(sigma_yx,axis=0)
+
+        
+    def complete_ML(self):
+
+
+    def maximum_likelihood_c(self,xtest):
+        logP_D1_M
+        logP_D1_theta_M
+        logP_D_theta_M
+        return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
+
+
 
 
