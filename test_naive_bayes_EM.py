@@ -103,12 +103,11 @@ def main(argv):
             
         nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE)
         nbem.testModel(xdata_ml,ydata,_DATE)
-        out_proba = open('predict_prob','w')
-        res = nbem.predict_proba(xdata_ml)
-        for item in res:
-            print >>out_proba,item
-        #print >>out_proba,nbem.feature_log_prob_
-        out_proba.close()
+        #out_proba = open('predict_prob','w')
+        #res = nbem.predict_proba(xdata_ml)
+        #for item in res:
+            #print >>out_proba,item
+        #out_proba.close()
     else:
         raise ValueError("Oh I just know NBEM. The corresponding LTYPE is 0")
             
