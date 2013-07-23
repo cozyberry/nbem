@@ -403,6 +403,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         self.printStats(dist,out_hu)
         out_hu.close()
 
+    
     def printStats(self,dist,out=None):
         
         if out==None:
@@ -442,7 +443,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
         BaseMultinomialNBEM.__init__(self,alpha,fit_prior,class_prior)
 
-    def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False,ydata=None):
+    def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False,ydata=None,_bayes=False):
         if n_cluster <1:
             raise ValueError("Please input a maximum cluster number no smaller than 1")
         if iterCN<0:
@@ -454,6 +455,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         self.iterCN = iterCN
         self.iterSN = iterSN
         self.init =initMethod
+        self._bayes = _bayes
 
         self.d=self.n_cluster-1+self.n_cluster*(self.nfeatures[-1]-len(self.nfeatures)+1)
 
@@ -478,6 +480,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         best_iter = 0
         best_class_prior = None 
         best_feature_log_prob = None
+        classes_backup = None
+        if numc == 1:
+            self.iterSN = 1 
+
         for j in range(0,self.iterSN):
             if numc == 1:
                 self.classes_=np.array([1],int)
@@ -490,7 +496,6 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
-                self.iterSN = 1
                 self.iterCN = 0
                 initMethod = -1
         #Initializing step of target
@@ -537,7 +542,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 self.class_log_prior_=np.log(q_y)
 
                 #alpha is very import to smooth. or else in log when the proba is too small we got -inf
-                #ncx = safe_sparse_dot(sigma_yx.T, xtrain)+mnb.alpha
+                #ncx = safe_sparse_dot(sigma_yx.T, xtrain)+mnb.alpha-1
                 ######MAP###########################################
                 ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1
                 ncxsum=np.sum(ncx,axis=1)
@@ -569,11 +574,18 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 best_iter = j
                 best_class_log_prior=copy.deepcopy(self.class_log_prior_)
                 best_feature_log_prob=copy.deepcopy(self.feature_log_prob_)
+                classes_backup = copy.deepcopy(self.classes_)
 
                         
 
         self.class_log_prior_=copy.deepcopy(best_class_log_prior)
         self.feature_log_prob_=copy.deepcopy(best_feature_log_prob)
+        self.classes_=copy.deepcopy(classes_backup)
+
+        if self._bayes:
+            ytrain=self.predict(xtrain)
+            naive_bayes.MultinomialNB.fit(self,xtrain,ytrain)
+            print "Bayes smoothing..."
 
         print "Best one is at %dth iteration"%best_iter
         print "The corresponding log_prob: ", bestlog_prob
@@ -584,8 +596,9 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             log.close()
 
         self.calCPT()
+        print "%d clusters; %d params"%(self.n_cluster,self.d)
         print "BIC: %f"%self.BIC(xtrain)
-        print "Cheeseman_Stutz_Score: %f"%self.cheeseman_stutz_score(xtrain)
+        print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
 
 
     """
@@ -618,10 +631,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 self.sum_expect_nclass_feature = np.sum(self.expect_nclass_feature[:,self.nfeatures[i]:self.nfeatures[i+1]],axis=1)
             else:
                 self.sum_expect_nclass_feature = np.hstack((self.sum_expect_nclass_feature,np.sum(self.expect_nclass_feature[:,self.nfeatures[i]:self.nfeatures[i+1]],axis=1)))
-        print self.expect_nclass
-        print self.expect_nclass_feature
         print np.sum(self.expect_nclass)
         print self.sum_expect_nclass_feature
+        print self.expect_nclass
+        print self.expect_nclass_feature
         """
 
     def complete_model_ML(self):
@@ -634,15 +647,14 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             if i==0:
                 gamma_sum_nclass_feature=cur_gamma_sum_nclass_feature
             else:
-                gamma_sum_nclass_feature=np.hstack((gamma_sum_nclass_feature,cur_gamma_sum_nclass_feature))
-
+                gamma_sum_nclass_feature=np.hstack((gamma_sum_nclass_feature,cur_gamma_sum_nclass_feature)) 
 
         #pprint.pprint(locals())
         nparams=self.n_cluster+self.n_cluster*(self.nfeatures[-1])
-        
         gamma_sum_alpha=special.gammaln(self.n_cluster*self.alpha)
         for i in range(0,nFeature):
             gamma_sum_alpha+=self.n_cluster*special.gammaln(self.alpha*(self.nfeatures[i+1]-self.nfeatures[i]))
+
 
         return np.sum(gamma_nclass_feature)+np.sum(gamma_nclass)-np.sum(gamma_sum_nclass_feature)-gamma_sum_nclass+gamma_sum_alpha-nparams*special.gammaln(self.alpha)
 
@@ -660,6 +672,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         logP_D1_M = self.complete_model_ML()
         logP_D1_theta_M = self.complete_param_ML()
         logP_D_theta_M = self.calcObj(xtest,obj='ML')
+        #pprint.pprint(locals())
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 
 
