@@ -32,11 +32,13 @@ def usage():
                                      0: uniform initialization
                                      1: k points methods. Refer to PHAM2009 'Unsupervised training of bayesian networks for data clustering'"""
     print "    [-a]: set default attributes information"
+    print "    [-b]: add bayes smooth operation at last"
+    print "    [--alpha value_of_alpha]: specify value of alpha for prior dirichelet distribution"
 
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv,"hc:n:s:k:i:vodp",["help"])
+        opts, args = getopt.getopt(argv,"hc:n:s:k:i:bvodp",["help","alpha="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -53,7 +55,9 @@ def main(argv):
     initMethod = 0
     _PARTITION = False
     _attr = False
+    _bayes= False
     numc = 4
+    alpha = 2.0
     for opt,arg in opts:
         if opt in ("-h","--help"):           
             usage()
@@ -82,6 +86,11 @@ def main(argv):
             initMethod = int(arg)
         elif opt in ("-a"):
             _attr=True
+        elif opt in ("-b"):
+            _bayes=True
+        elif opt in ("--alpha"):
+            print arg
+            alpha=float(arg)
 
     if LTYPE == 0:
         random.seed()
@@ -92,7 +101,7 @@ def main(argv):
         writer = csv.writer(out_rdata)
         writer.writerows(rdata)
         out_rdata.close()
-        nbem=naive_bayes_EM.MultinomialNBEM(alpha=2.0)
+        nbem=naive_bayes_EM.MultinomialNBEM(alpha=alpha)
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
             nbem.setOutput(OUTPUTDIR)
@@ -101,7 +110,7 @@ def main(argv):
         else:
             xdata_ml,ydata=nbem.fit_transformRaw(rdata,True)
             
-        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE)
+        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE,_bayes=_bayes)
         nbem.testModel(xdata_ml,ydata,_DATE)
         #out_proba = open('predict_prob','w')
         #res = nbem.predict_proba(xdata_ml)
