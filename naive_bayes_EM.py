@@ -315,16 +315,18 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                     title+=",%f"%frac
                 print >>out,title
             print >> out,"" 
-
+    #def predictStats(self,xdata_ml,timestamp=True,Ou
 
     """
     xdata_ml is the transformed xdata
     ydata is the index version of original label information
     """
-    def testModel(self,xdata_ml,ydata,timestamp=True,OUTPUTDIR=None):
-        if self.ykeys == None:
+    def testModel(self,xdata_ml,ydata=None,timestamp=True,OUTPUTDIR=None):
+
+        if ydata!=None and self.ykeys == None:
             self.ykeys = range(0,np.amax(ydata))
-        ykeys= self.ykeys
+            ykeys= self.ykeys
+            numc = len(ykeys)
 
         if OUTPUTDIR == None:
             if self.outputDir != None:
@@ -337,16 +339,17 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         curnumc = np.size(self.feature_log_prob_,0)
         numrows = np.size(xdata_ml,0)
         ypredict = self.predict(xdata_ml)
-        numc = len(ykeys)
         #ykeys,garbage,ydata_n = np.unique(xdata[:,k],True,True)
-        dist = np.zeros((curnumc,numc))
-        for i in range(0,curnumc):
-            a=(ypredict==i)
-            for j in range(0,numc):
-                oj = (ydata == j)
-                dist[i][j]=np.sum(np.multiply(a,oj))
+        if ydata!=None:
+            dist = np.zeros((curnumc,numc))
+            for i in range(0,curnumc):
+                a=(ypredict==i)
+                for j in range(0,numc):
+                    oj = (ydata == j)
+                    dist[i][j]=np.sum(np.multiply(a,oj))
 
-        self.printStats(dist)
+            self.printStats(dist)
+
         self.outputCPT()
 
         outputDate=strftime("%m%d%H%M%S",localtime())
@@ -365,9 +368,13 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         for attr in self.featnames:
             title +="%s,"%attr
         title_hu=title
+        if ydata != None:
+            title+='predicted_class,numerical_class'
+            title_hu+='class,predicted_class,numerical_class'
+        else:
+            title+='predicted_class'
+            title_hu+='predicted_class'
 
-        title+='predicted_class,numerical_class'
-        title_hu+='class,predicted_class,numerical_class'
 
         print >> out,title
         print >> out_hu,title_hu
@@ -380,27 +387,34 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                 item = xdata_ori[i][j]
                 onerow+="%d,"%item
                 onerow_hu+="%s,"%self.xkeys[j][item]
-            onerow+="%d,%d"%(ypredict[i],ydata[i])
-            onerow_hu+="%s,%d,%d"%(str(ykeys[ydata[i]]),ypredict[i],ydata[i])
+            if ydata!=None:
+                onerow+="%d,%d"%(ypredict[i],ydata[i])
+                onerow_hu+="%s,%d,%d"%(str(ykeys[ydata[i]]),ypredict[i],ydata[i])
+            else:
+                onerow+="%d"%ypredict[i]
+                onerow_hu+="%d"%ypredict[i]
+
 
             print >> out,onerow
             print >> out_hu,onerow_hu 
 
         out.close()
         print >>out_hu,""
-        ari = metrics.adjusted_rand_score(ydata,ypredict)
-        ami = metrics.adjusted_mutual_info_score(ydata,ypredict)
-        nmi = metrics.normalized_mutual_info_score(ydata,ypredict)
-        print >>out_hu,"adjusted rand index: %f"%ari
-        print "adjusted rand index: %f"%ari
-        print >>out_hu,"adjusted mutual info score: %f"%ami
-        print "adjusted mutual info score: %f"%ami
-        print >>out_hu,"normalized mutual info score: %f"%nmi
-        print "normalized mutual info score: %f"%nmi
+        if ydata!=None:
+            ari = metrics.adjusted_rand_score(ydata,ypredict)
+            ami = metrics.adjusted_mutual_info_score(ydata,ypredict)
+            nmi = metrics.normalized_mutual_info_score(ydata,ypredict)
+            print >>out_hu,"adjusted rand index: %f"%ari
+            print "adjusted rand index: %f"%ari
+            print >>out_hu,"adjusted mutual info score: %f"%ami
+            print "adjusted mutual info score: %f"%ami
+            print >>out_hu,"normalized mutual info score: %f"%nmi
+            print "normalized mutual info score: %f"%nmi
         print >>out_hu,""
         self.outputCPT(out_hu)
-        print >>out_hu,""
-        self.printStats(dist,out_hu)
+        if ydata!=None:
+            print >>out_hu,""
+            self.printStats(dist,out_hu)
         out_hu.close()
 
     
