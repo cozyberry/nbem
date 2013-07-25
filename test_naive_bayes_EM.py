@@ -96,7 +96,6 @@ def main(argv):
             print arg
             alpha=float(arg)
 
-    print "_labeled ",_labeled
 
     if LTYPE == 0:
         random.seed()
@@ -117,7 +116,6 @@ def main(argv):
             else:
                 xdata_ml,ydata=nbem.fit_transformRaw(rdata,True)
         else:
-            print "here"
             if _attr:
                 xdata_ml=nbem.fit_transformRaw(rdata,False,ATTRIBUTES)
             else:
@@ -127,7 +125,6 @@ def main(argv):
         if _labeled:
             nbem.testModel(xdata_ml,ydata,_DATE)
         else:
-            print "here"
             nbem.testModel(xdata_ml,timestamp=_DATE)
             
         #out_proba = open('predict_prob','w')
