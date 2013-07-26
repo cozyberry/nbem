@@ -98,7 +98,6 @@ def main(argv):
             alpha=float(arg)
 
 
-    print 'hi'
     if LTYPE == 0:
         random.seed()
         if len(args) > 0:

@@ -315,7 +315,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                     title+=",%f"%frac
                 print >>out,title
             print >> out,"" 
-<<<<<<< HEAD
+
     def get_filename(self,prefix,timestamp=True):
 
         outputDate=strftime("%m%d%H%M%S",localtime())
@@ -328,9 +328,6 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
 
 
 
-=======
-    #def predictStats(self,xdata_ml,timestamp=True,Ou
->>>>>>> init_branch
 
     """
     xdata_ml is the transformed xdata
@@ -338,8 +335,9 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     """
     def testModel(self,xdata_ml,ydata=None,timestamp=True,OUTPUTDIR=None):
 
-        if ydata!=None and self.ykeys == None:
-            self.ykeys = range(0,np.amax(ydata))
+        if ydata!=None:
+            if self.ykeys == None:
+                self.ykeys = range(0,np.amax(ydata))
             ykeys= self.ykeys
             numc = len(ykeys)
 
@@ -428,18 +426,10 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
             print >>out_hu,"normalized mutual info score: %f"%nmi
             print "normalized mutual info score: %f"%nmi
         print >>out_hu,""
-<<<<<<< HEAD
-        print >>out_hu,""
-        self.printStats(dist,out_hu)
-=======
-        self.outputCPT(out_hu)
         if ydata!=None:
             print >>out_hu,""
             self.printStats(dist,out_hu)
->>>>>>> init_branch
         out_hu.close()
-        #score_file=open(score_filename,'w')
-        #self.outputCPT(score_file)
 
     
     def printStats(self,dist,out=None):
@@ -638,7 +628,8 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         print "BIC: %f"%self.BIC(xtrain)
         print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
 
-        score_filename=self.get_filename(self,'score_nbem')
+        score_filename=self.get_filename('score_nbem')
+        score_filename=os.path.join(self.outputDir,score_filename)
         score_file=open(score_filename,'w')
         self.outputCPT(score_file)
         score_file.close()
