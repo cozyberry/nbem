@@ -19,7 +19,7 @@ OUTPUTDIR ='/home/wei/share/nbem/outputs/'
 LTYPE = 0
 
 def usage():
-    print "%s [-c type_of_likelihood] [-n nonstochastic_iteration_times] [-s stochastic_iteration_times] [-v] [-o] [-d] [-k initial_clustering_number] [-i initial_method] [-a] [filenames]"%sys.argv[0]
+    print "%s [-c type_of_likelihood] [-n nonstochastic_iteration_times] [-s stochastic_iteration_times] [-v] [-o] [-d] [-k initial_clustering_number] [-i initial_method] [-a] [-u] [filenames]"%sys.argv[0]
     print "     [-c type_of_likelihood]: 0 for normal likelihood;1 for classification likelihood;2 for naive bayesian network. 0 By default"
     print "     [-n iteration_times]: set nonstochastic iteration times for EM method. Default is 20"
     print "     [-s stochastic_iteration_times]: set stochastic iteration times for EM method. Default is 1"
@@ -32,11 +32,14 @@ def usage():
                                      0: uniform initialization
                                      1: k points methods. Refer to PHAM2009 'Unsupervised training of bayesian networks for data clustering'"""
     print "    [-a]: set default attributes information"
+    print "    [-b]: add bayes smooth operation at last"
+    print "    [--alpha value_of_alpha]: specify value of alpha for prior dirichelet distribution"
+    print "    [-u]: has no label info"
 
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv,"hc:n:s:k:i:vodp",["help"])
+        opts, args = getopt.getopt(argv,"hc:n:s:k:i:bvodpu",["help","alpha="])
     except getopt.GetoptError:
         print 'option parsing error!'
         usage()
@@ -54,7 +57,10 @@ def main(argv):
     initMethod = 0
     _PARTITION = False
     _attr = False
+    _bayes= False
     numc = 4
+    alpha = 2.0
+    _labeled = True 
     for opt,arg in opts:
         if opt in ("-h","--help"):           
             usage()
@@ -83,6 +89,14 @@ def main(argv):
             initMethod = int(arg)
         elif opt in ("-a"):
             _attr=True
+        elif opt in ("-b"):
+            _bayes=True
+        elif opt in ("-u"):
+            _labeled=False
+        elif opt in ("--alpha"):
+            print arg
+            alpha=float(arg)
+
 
     print 'hi'
     if LTYPE == 0:
@@ -94,17 +108,27 @@ def main(argv):
         writer = csv.writer(out_rdata)
         writer.writerows(rdata)
         out_rdata.close()
-        nbem=naive_bayes_EM.MultinomialNBEM(alpha=2.0)
+        nbem=naive_bayes_EM.MultinomialNBEM(alpha=alpha)
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
             nbem.setOutput(OUTPUTDIR)
-        if _attr:
-            xdata_ml,ydata=nbem.fit_transformRaw(rdata,True,ATTRIBUTES)
+        if _labeled:
+            if _attr:
+                xdata_ml,ydata=nbem.fit_transformRaw(rdata,True,ATTRIBUTES)
+            else:
+                xdata_ml,ydata=nbem.fit_transformRaw(rdata,True)
         else:
-            xdata_ml,ydata=nbem.fit_transformRaw(rdata,True)
+            if _attr:
+                xdata_ml=nbem.fit_transformRaw(rdata,False,ATTRIBUTES)
+            else:
+                xdata_ml=nbem.fit_transformRaw(rdata,False)
             
-        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE)
-        nbem.testModel(xdata_ml,ydata,_DATE)
+        nbem.build(numc,xdata_ml,ITERSN,ITERCN,initMethod,_DATE,_bayes=_bayes)
+        if _labeled:
+            nbem.testModel(xdata_ml,ydata,_DATE)
+        else:
+            nbem.testModel(xdata_ml,timestamp=_DATE)
+            
         #out_proba = open('predict_prob','w')
         #res = nbem.predict_proba(xdata_ml)
         #for item in res:
