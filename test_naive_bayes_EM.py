@@ -38,6 +38,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv,"hc:n:s:k:i:vodp",["help"])
     except getopt.GetoptError:
+        print 'option parsing error!'
         usage()
         sys.exit(2)
     global ITERCN
@@ -83,6 +84,7 @@ def main(argv):
         elif opt in ("-a"):
             _attr=True
 
+    print 'hi'
     if LTYPE == 0:
         random.seed()
         if len(args) > 0:

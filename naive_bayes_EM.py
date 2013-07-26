@@ -315,6 +315,17 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
                     title+=",%f"%frac
                 print >>out,title
             print >> out,"" 
+    def get_filename(self,prefix,timestamp=True):
+
+        outputDate=strftime("%m%d%H%M%S",localtime())
+        if timestamp:
+                    outname="%s_i%d_r%d_n%d_k%d_%s.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
+        else:
+                    outname="%s_i%d_r%d_n%d_k%d.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
+        return outname
+
+
+
 
 
     """
@@ -349,14 +360,16 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         self.printStats(dist)
         self.outputCPT()
 
-        outputDate=strftime("%m%d%H%M%S",localtime())
-        prefix='test_nbem'
-        if timestamp:
-            outname="%s_i%d_r%d_n%d_k%d_%s.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
-            outname_hu="%s_i%d_r%d_n%d_k%d_%s_hu.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
-        else:
-            outname="%s_i%d_r%d_n%d_k%d.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
-            outname_hu="%s_i%d_r%d_n%d_k%d_hu.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
+        outname=self.get_filename('test_nbem',timestamp)
+        outname_hu=self.get_filename('test_nbem_hu',timestamp)
+        #if timestamp:
+            #outname="%s_i%d_r%d_n%d_k%d_%s.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
+            #outname_hu="%s_i%d_r%d_n%d_k%d_%s_hu.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
+            #score_filename="%s_i%d_r%d_n%d_k%d_%s.csv"%(prefix1,self.init,self.iterSN,self.iterCN,self.n_cluster,outputDate)
+        #else:
+            #outname="%s_i%d_r%d_n%d_k%d.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
+            #outname_hu="%s_i%d_r%d_n%d_k%d_hu.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
+            #score_filename="%s_i%d_r%d_n%d_k%d.csv"%(prefix1,self.init,self.iterSN,self.iterCN,self.n_cluster)
 
         out=open(os.path.join(OUTPUTDIR,outname),'w')
         out_hu=open(os.path.join(OUTPUTDIR,outname_hu),'w')
@@ -398,10 +411,11 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         print >>out_hu,"normalized mutual info score: %f"%nmi
         print "normalized mutual info score: %f"%nmi
         print >>out_hu,""
-        self.outputCPT(out_hu)
         print >>out_hu,""
         self.printStats(dist,out_hu)
         out_hu.close()
+        #score_file=open(score_filename,'w')
+        #self.outputCPT(score_file)
 
     
     def printStats(self,dist,out=None):
@@ -600,6 +614,10 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         print "BIC: %f"%self.BIC(xtrain)
         print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
 
+        score_filename=self.get_filename(self,'score_nbem')
+        score_file=open(score_filename,'w')
+        self.outputCPT(score_file)
+        score_file.close()
 
     """
     Attention: xtrain should be in well transformed format

@@ -4,6 +4,14 @@ import random
 import string
 from time import localtime, strftime, time
 from sklearn import metrics
+from scipy import special
+from pprint import pprint
+def multibetaln(x):
+    gammalnx=special.gammaln(x)
+    sumx=np.sum(x)
+    gammalnsumx=special.gammaln(sumx)
+    pprint(locals())
+    return np.sum(gammalnx)-gammalnsumx
 
 """
 if _labeled is True, the last column of data should be label information
