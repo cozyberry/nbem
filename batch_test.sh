@@ -5,7 +5,7 @@ basename=(`echo ${names[-1]}|tr '\.' '\n'`)
 basename=${basename[0]}
 if [ -d $basename ];then
     echo "$basename exists! Renamed"
-    mv $basename ${basename}_old
+    mv -f $basename ${basename}_old
 fi
 mkdir $basename
 cstable=${basename}/${basename}_cstable
