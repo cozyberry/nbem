@@ -215,8 +215,8 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
         kpoints = np.ones_like(xdata_ml[0:numc,:],dtype=int)
         for i in range(0,numc):
             while True:
-                index = random.randint(0,numrows)
-                kpoints[i]=xdata_ml[index]
+                index = random.randint(0,numrows-1)
+                kpoints[i]=xdata_ml[index,:]
                 earlyBreak = False
                 for j in range(0,i):
                     if LA.norm(kpoints[i]-kpoints[j]) == 0:
@@ -624,9 +624,11 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             log.close()
 
         self.calCPT()
-        print "%d clusters; %d params"%(self.n_cluster,self.d)
-        print "BIC: %f"%self.BIC(xtrain)
-        print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
+        #print "%d clusters; %d params"%(self.n_cluster,self.d)
+        #print "BIC: %f"%self.BIC(xtrain)
+        #print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
+        print "n_cluster,Log_MAP,BIC,CS_Marginal_likelihood"
+        print "%f,%f,%f%f"%(self.n_cluster,bestlog_prob,self.BIC(xtrain),self.cheeseman_stutz_score(xtrain))
 
         score_filename=self.get_filename('score_nbem')
         score_filename=os.path.join(self.outputDir,score_filename)
