@@ -9,25 +9,28 @@ if [ -d $basename ];then
     if [ x$ans = xy ] || [ x$ans = xY ];then
         rm -r $basename
     else
-        now=`date +%m%d%H%M%S`
+        now=`date +%y%m%d%H%M%S`
         mv  ${basename} ${basename}$now
     fi
-else mkdir $basename
 fi
+mkdir $basename
 cstable=${basename}/${basename}_cstable
-echo "Cheeseman Stutz Scores of different models" > $cstable
-s=20
-n=150
+s=64
+n=50
 while [ $i -le $1 ];
 do
-    #echo "./test_naive_bayes_EM.py -i 1 -c 0 -n $n -s $s -k $i -od $2 >> ${basename}/${basename}_log$i"
-    #./test_naive_bayes_EM.py -i 1 -c 0 -n $n -s $s -k $i -od $2 >> ${basename}/${basename}_log$i
-    cmd="./test_naive_bayes_EM.py -i 1 -c 0 -n $n -s $s -k $i -ou $2 > ${basename}/${basename}_log$i"
+    outputdir=${basename}/cluster_$i
+    mkdir $outputdir
+    cmd="./test_naive_bayes_EM.py -i 1 -c 0 -n $n -s $s -k $i -o ${outputdir} -u $2 > ${basename}/${basename}_log$i"
     echo $cmd
     eval $cmd
-    echo "$i clusters" >> $cstable
-    head -n 5 ${basename}/${basename}_log$i>> $cstable
-    echo "" >> $cstable
+    if [ $i -eq 1 ];then
+        grep  -A1 "n_cluster,Log_MAP,BIC,CS_Marginal_likelihood" ${basename}/${basename}_log$i > $cstable
+        #tail -n2 ${basename}/${basename}_log$i> $cstable
+    else
+        grep  -A1 "n_cluster,Log_MAP,BIC,CS_Marginal_likelihood" ${basename}/${basename}_log$i |tail -n1 >> $cstable
+        #tail -n1 ${basename}/${basename}_log$i>> $cstable
+    fi
     i=$(($i+1))
 done
 

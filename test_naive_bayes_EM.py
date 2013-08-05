@@ -19,12 +19,12 @@ OUTPUTDIR ='/home/wei/share/nbem/outputs/'
 LTYPE = 0
 
 def usage():
-    print "%s [-c type_of_likelihood] [-n nonstochastic_iteration_times] [-s stochastic_iteration_times] [-v] [-o] [-d] [-k initial_clustering_number] [-i initial_method] [-a] [-u] [filenames]"%sys.argv[0]
+    print "%s [-c type_of_likelihood] [-n nonstochastic_iteration_times] [-s stochastic_iteration_times] [-v] [-o outputdir] [-d] [-k initial_clustering_number] [-i initial_method] [-a] [-u] [filenames]"%sys.argv[0]
     print "     [-c type_of_likelihood]: 0 for normal likelihood;1 for classification likelihood;2 for naive bayesian network. 0 By default"
     print "     [-n iteration_times]: set nonstochastic iteration times for EM method. Default is 20"
     print "     [-s stochastic_iteration_times]: set stochastic iteration times for EM method. Default is 1"
     print "     [-v]: set verbose mode. Print other detail infomation"
-    print "     [-o]: output predicted class label and original label as well for further analysis"
+    print "     [-o outputdir]: specify outputdir. using %s by default"%OUTPUTDIR
     print "     [-d]: output file name with time stamp, only valid together with -o option"
     print "     [-k initial_clustering_number]: set an initial clustering number for EMNB or ECMNB."
     print """     [-i initial_method]:            set initial methods of label for EM method. 
@@ -39,7 +39,7 @@ def usage():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv,"hc:n:s:k:i:bvodpu",["help","alpha="])
+        opts, args = getopt.getopt(argv,"hc:n:s:k:i:bvo:dpu",["help","alpha="])
     except getopt.GetoptError:
         print 'option parsing error!'
         usage()
@@ -64,6 +64,7 @@ def main(argv):
     for opt,arg in opts:
         if opt in ("-h","--help"):           
             usage()
+            print arg
             sys.exit(0)
         elif opt in ("-c"):
             LTYPE = int(arg)
@@ -79,6 +80,12 @@ def main(argv):
             #_MAXLOG= True
         elif opt in ("-o"):
             _OUTPUT= True
+            outputdir = arg
+            if (not os.path.exists(outputdir)) or (not os.path.isdir(outputdir)):
+                print "Output directory: %s does not exist!"%outputdir
+                usage()
+                sys.exit(1)
+
         elif opt in ("-d"):
             _DATE= True
         elif opt in ("-p"):
@@ -110,7 +117,7 @@ def main(argv):
         nbem=naive_bayes_EM.MultinomialNBEM(alpha=alpha)
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
-            nbem.setOutput(OUTPUTDIR)
+            nbem.setOutput(outputdir)
         if _labeled:
             if _attr:
                 xdata_ml,ydata=nbem.fit_transformRaw(rdata,True,ATTRIBUTES)

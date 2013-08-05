@@ -628,9 +628,9 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         #print "BIC: %f"%self.BIC(xtrain)
         #print "Cheeseman_Stutz_Score: %0.15f"%self.cheeseman_stutz_score(xtrain)
         print "n_cluster,Log_MAP,BIC,CS_Marginal_likelihood"
-        print "%f,%f,%f%f"%(self.n_cluster,bestlog_prob,self.BIC(xtrain),self.cheeseman_stutz_score(xtrain))
+        print "%f,%f,%f,%f"%(self.n_cluster,bestlog_prob,self.BIC(xtrain),self.cheeseman_stutz_score(xtrain))
 
-        score_filename=self.get_filename('score_nbem')
+        score_filename=self.get_filename('score_nbem',timestamp=timestamp)
         score_filename=os.path.join(self.outputDir,score_filename)
         score_file=open(score_filename,'w')
         print >>score_file,"%d clusters; %d params"%(self.n_cluster,self.d)
@@ -723,6 +723,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         logP_D1_M = self.complete_model_ML()
         logP_D1_theta_M = self.complete_param_ML()
         logP_D_theta_M = self.calcObj(xtest,obj='ML')
+        print "%d ncluster: %f %f"%(self.n_cluster,logP_D1_theta_M,logP_D_theta_M)
         #pprint.pprint(locals())
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 
