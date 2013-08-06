@@ -15,6 +15,7 @@ import random
 import copy
 import pprint
 from scipy import special
+from data_utilities import multibetaln
 
 class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     """
@@ -665,7 +666,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             return log_prob
         elif obj == 'MAP':
             log_theta = np.sum(self.class_log_prior_)+np.sum(self.feature_log_prob_)
-            log_prob = log_prob+(self.alpha#-1)*log_theta
+            log_prob = log_prob+(self.alpha)*log_theta
             return log_prob
 
     def BIC(self,xtest):
