@@ -471,6 +471,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
         BaseMultinomialNBEM.__init__(self,alpha,fit_prior,class_prior)
 
+
     def build(self,n_cluster,xtrain,iterSN=10,iterCN=100,initMethod=0,timestamp=False,ydata=None,_bayes=False):
         if n_cluster <1:
             raise ValueError("Please input a maximum cluster number no smaller than 1")
@@ -516,11 +517,11 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             if numc == 1:
                 self.classes_=np.array([1],int)
                 sigma_yx=np.ones((numrows,1),float)
-                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
                 q = np.sum(q_y)
                 q_y = np.divide(q_y,q) 
                 self.class_log_prior_=np.log(q_y)
-                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha#-1
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
@@ -564,7 +565,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 old_sigma_yx=sigma_yx
             #M-step
                 #q_y=np.sum(sigma_yx,axis=0)/numrows 
-                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
                 q = np.sum(q_y)
                 q_y = np.divide(q_y,q) 
                 self.class_log_prior_=np.log(q_y)
@@ -572,7 +573,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
                 #alpha is very import to smooth. or else in log when the proba is too small we got -inf
                 #ncx = safe_sparse_dot(sigma_yx.T, xtrain)+mnb.alpha-1
                 ######MAP###########################################
-                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha#-1
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
@@ -664,7 +665,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             return log_prob
         elif obj == 'MAP':
             log_theta = np.sum(self.class_log_prior_)+np.sum(self.feature_log_prob_)
-            log_prob = log_prob+(self.alpha-1)*log_theta
+            log_prob = log_prob+(self.alpha#-1)*log_theta
             return log_prob
 
     def BIC(self,xtest):
