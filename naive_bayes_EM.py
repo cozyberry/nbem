@@ -1,4 +1,18 @@
 #! /usr/bin/python
+"""@package naive_bayes_EM
+naive_bayes implements training of a Naive Bayes Network from unlabeled data. I use class structure of naive_bayes.BaseDiscreteNB which offers a quite good way of how to store the paremeter configuration of a naive bayes net. From this structure naive_bayes_EM itself implements a CategoricalNB which uses EM method to learn MAP parameter configuration. Details of implemenation are given in CategoricalNBEM.build() function. 
+
+The basic idea of training is that: given a dataset \f${\mathbf{X_1},\mathbf{X_2},...,\mathbf{X_N}}\f$ where N is the number of samples and each  we would like to train a naive bayes network. And \f$ \mathbf{X_r} = {x_1,x_2,..,x_n}\f$where n is the number of features. Given a particular number of cluster k, our engine aimes at finding a MAP parameter configuration \f$ \theta_{MAP}  = argmax_{\theta}P(\theta|D,m)\f$, where \f$m\f$ refers to the structure of segmentation mode, more precisely, a naive bayesian network with latent class node as the root having k number of possible clustering result. For more detailed mathematical introduction of model specification, please refer to my report as well as these papers Cheeseman1995 @cite acsbayesian Chickering1997 @cite chickering1997efficient and Friedman1997@cite friedman1997bayesian 
+
+@note  The reason why I did not use the MultinomialNB directly is that the MultinomialNB supposes that each feature follows a multinomial distribution, in our training task, each feature follows a categorical distibution. This means for for feature \f$x_i\f$ which has \f$r_i \f$ possible state of value, \f$ {P(x_i=v_j|c) = p_j, j\in {1,2,...,r_i}}\f$ . However Categorical distribution is just the generization of Bernoulli distribution. So it is quite natual to reuse BaseDiscreteNB for my class.
+
+@warning The difference between multinomial distribution and categorical distribution determines how we should preprocessing the given data. The original implementation of naive_bayes.MultinomialNB is specially used for text classification. In the source code MultinomialNB did binarization for label data(y), not for feature data(xdata). Forcategorical distribution we should be both binarization operation for xdata as well as for y. Please see BaseCategoricalNB.fit_transformRaw() function for details of implementation.
+
+@remark
+Please go to http://scikit-learn.org/stable/modules/naive_bayes.html for detailed information on used naive_bayes models. 
+And http://thinkmodelcode.blogspot.fr/2013/04/naive-bayes-classification-using-python.html for an example of classification task. The classification task is more simple since it does not require EM method.
+
+"""
 
 from sklearn.preprocessing import LabelBinarizer
 from sklearn import naive_bayes
@@ -15,9 +29,8 @@ import random
 import copy
 import pprint
 from scipy import special
-from data_utilities import multibetaln
 
-class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
+class BaseCategoricalNBEM(naive_bayes.BaseDiscreteNB):
     """
     a Multinomial Naive Bayes Cluster which combines [naive bayes classifier implementation] and [EM or ECM method] to deal with missing label information. 
 
@@ -86,17 +99,38 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     naive Bayes as a linear classifier, see J. Rennie et al. (2003),
     Tackling the poor assumptions of naive Bayes text classifiers, ICML.
     """
+
+
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
-        naive_bayes.MultinomialNB.__init__(self,alpha,fit_prior,class_prior)
+        """Constructor of BaseCategoricalNBEM class
+        Args:
+            alpha: float, optional, default=1.0
+                Parameter in the Dirichelet prior distribution of all the parameters. In bayesian statistique, we have prior distribution for parameters. A general Dirichlet distribution looks like this: \f$f(x_1,\dots, x_{K-1}; \alpha_1,\dots, \alpha_K) = \frac{1}{\mathrm{B}(\alpha)} \prod_{i=1}^K x_i^{\alpha_i - 1}\f$ for all \f$x_1,\dots,x_{K} > 0 \f$ satisfying \f$x_1 + \dots + x_{K} = 1 \f$. Here we use a symmetric Dirichlet distribution, where all of the elements making up the parameter vector \f$\alpha\f$ have the same value "alpha" in the input parameter lists. Intuitively a given \f$\alpha\f$ vector means adding \f$\alpha_i\f$ imaginary occurrences of event \f$x_i\f$. The reason why we choose Dirichelet distribution is because it is the conjugate prior of Categorical distribution and Multinomial Distribution.
+            fit_prior: boolean, optional, default=True
+                Whether to learn class prior probabilities or not.
+                If false, a uniform prior will be used.
+            class_prior: array-like, size=[n_classes,],default=None
+                Prior probabilities of the classes. If specified the priors are not
+                adjusted according to the data.
+
+        @see http://en.wikipedia.org/wiki/Dirichlet_distribution for details of Dirichelet distribution. And Friedman1997@cite friedman1997bayesian for details of prior distribution and why we choose dirichelet distribution as the prior. 
+        """
+        self.alpha = alpha
+        self.fit_prior = fit_prior
+        self.class_prior = class_prior
         self._verbose = False
         self.outputDir = None 
+
         if fit_prior == True and class_prior:
-            print "The fit_prior and class_prior are both set as True. We will use the assigned class_prior and the fit_prior will be ignored"
+            """Confilicts of given arguments"""
+            print "Warning: the fit_prior and class_prior are both set. We will use the assigned class_prior and the fit_prior will be ignored"
 
     def setVerbose(self,verbose):
+        """set verbose mode by the input argument"""
         self._verbose = verbose
 
     def setOutput(self,outputdir):
+        """set output directory for engine outputs"""
         if (not os.path.exists(outputdir)) or (not os.path.isdir(outputdir)):
             raise ValueError("The output directory is invalide %s"%outputdir) 
             return False 
@@ -719,13 +753,15 @@ class MultinomialNBEM(BaseMultinomialNBEM):
 
 
 
-    def cheeseman_stutz_score(self,xtest):
-        self.get_sufficient_stats(xtest)
+    
+    def cheeseman_stutz_score(self,xdata):
+        """Calculate approximate marginal likelihood by cheeseman stutz method.This method is proposed initially in Cheeseman1985. CS_Score equation: \f$ \lg{p(D|m)} \approx \lg{p(D^{'}|m)} - \lg{p(D^{'}|\tilde{\phi}_m,m)} + \lg{p(D|\tilde{\phi}_m,m)}\f$ where \f$ D^{'}\f$ is the extended dataset, that is, the original data set \f$D\f$ plus label info. We use such an extended dataset that its sufficient statistcs equals to those used for MAP configuration \f$\theta_MAP\f$(Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient)
+        @see Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient for details of formule deduction.
+        """
+        self.get_sufficient_stats(xdata)
         logP_D1_M = self.complete_model_ML()
         logP_D1_theta_M = self.complete_param_ML()
         logP_D_theta_M = self.calcObj(xtest,obj='ML')
-        #print "%d ncluster: %f %f"%(self.n_cluster,logP_D1_theta_M,logP_D_theta_M)
-        #pprint.pprint(locals())
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 
 
