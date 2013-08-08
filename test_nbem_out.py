@@ -1,16 +1,16 @@
 #! /usr/bin/python
-"""Documentation of one example how we use MultinomialNBEM class to train naive bayesian network with unlabeled data. True label information can also be provided to offer more methods for validation of the model.
-@package test_nbem
-@author Wei HU
-@version 2.0
-@note This script shows how to train a model with given number of clusters. User then can try different specific number of clusters and stick to a particular one after comparing marginal likelihood for each model. Here we provide 2 types of scores: BIC or Cheeseman_Stuzt score. They are both approximations of marginal likelihood. According to previous studies, Cheeseman_Stutz score seems to be more accurate"
-"""
+## @brief Documentation of one example how we use MultinomialNBEM class to train naive bayesian network with unlabeled data. True label information can also be provided to offer more methods for validation of the model.
+#@package test_nbem
+#@author Wei HU
+#@version 2.0
+#@note This script shows how to train a model with given number of clusters. User then can try different specific number of clusters and stick to a particular one after comparing marginal likelihood for each model. Here we provide 2 types of scores: BIC or Cheeseman_Stuzt score. They are both approximations of marginal likelihood. According to previous studies, Cheeseman_Stutz score seems to be more accurate"
+#
 
-import naive_bayes_EM 
+import naive_bayes_EM
 import os,sys,getopt,random,csv
 import numpy as np
 from optparse import OptionParser, OptionGroup
-import argparse 
+import argparse
 
 
 ##Default value for max number of iterations for one EM round
@@ -22,18 +22,18 @@ ITERSN = 1
 ##Default output directory for output files
 OUTPUTDIR =os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),'outputs/')
 
+##A function for parsing different options.
+#    Type python test_nbem.py -h for detailed information
+#    Parses command line options.
+#    Generally we're  providing diverse options for training a naive bayesian network.
+#    Please be patient, don't panic with these many options. They do exist for a reason LOL
+#    Type easily "python test_nbem.py -h" to display help information
+#
 def argParse():
-    """A function for parsing different options.
-    Type python test_nbem.py -h for detailed information
-    Parses command line options.
-    Generally we're  providing diverse options for training a naive bayesian network.
-    Please be patient, don't panic with these many options. They do exist for a reason LOL
-    Type easily "python test_nbem.py -h" to display help information 
-    """
 
     global ITERCN
     global ITERSN
-    global OUTPUTDIR 
+    global OUTPUTDIR
 
     parser = argparse.ArgumentParser(description='An example of training a naive bayesian network with a given number of clusters',prog=os.path.basename(sys.argv[0]),formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -45,12 +45,12 @@ def argParse():
         help="Specify number of clusters for this training task. One training process is done with specific number of existing clusters. Then users can try with different specified number of clusters and stick to a particular one after comparing marginal likelihood for each model. Here we provide 2 types of approximate scores: BIC or Cheeseman_Stuzt score.\n\n"
     )
     parser.add_argument(
-        "-n", 
+        "-n",
         action="store", type=int, dest="itercn",default=ITERCN,
         help="Specify max number of times in each round of EM iteration process.\n\n"
     )
     parser.add_argument(
-        "-r", 
+        "-r",
         action="store", type=int, dest="itersn",default=ITERSN,
         help="Specify number of times of restarts with a different initial configuration of the network.\n\n"
     )
@@ -118,28 +118,28 @@ def argParse():
 
     sys.exit(1)
 
+## @brief A function which read a csv format file
+#
+#    Retrieves rows from a given csv file.
+#
+#
+# @param		filename	Given sample file. Each row is comme separated representing one sample datum. Each column represents a feature. If provided with true label information, it should be put as the last column
+# @param		_attr	Specify whether provided with first line as titles of each feature
+#
+# @return
+#        A numpy array representation of given data. Size = [n_sample,n_feature] (or [n_sample,n_feature+1] when label information exists)
+#
+#
+# @exception		IOError	An error occured accssing the given input data file
+# @exception		ValueError	An error occured when given invalid datafile. A valid data should consist same dimensional datum. But it is ok that there exists empty feature name when attributes infomation provided as well.
+#
 def getcsvData(filename,_attr=False):
-    """A function which read a csv format file
-
-    Retrieves rows from a given csv file.
-
-    Args:
-        filename: Given sample file. Each row is comme separated representing one sample datum. Each column represents a feature. If provided with true label information, it should be put as the last column
-        _attr: Specify whether provided with first line as titles of each feature
-    
-    Returns:
-        A numpy array representation of given data. Size = [n_sample,n_feature] (or [n_sample,n_feature+1] when label information exists)
-
-    Raises:
-        IOError: An error occured accssing the given input data file
-        ValueError: An error occured when given invalid datafile. A valid data should consist same dimensional datum. But it is ok that there exists empty feature name when attributes infomation provided as well.
-    """
     if not (os.path.exists(filename) and os.path.isfile(filename)):
         raise IOError("Error: File %s not found!"%filename)
 
     """
     Open the inputfile and count nonempty rows.
-    Moreover test whether each nonempty row has the same dimension. 
+    Moreover test whether each nonempty row has the same dimension.
     A valid data should consist same dimensional  nonempty datum. But it is ok that there exists empty feature name when attributes infomation provided as well.
     """
     numrows = 0
@@ -159,7 +159,7 @@ def getcsvData(filename,_attr=False):
             elif ncols != len(row):
                 raise ValueError("Error: inconsistent column number at line: %d of file: %s"%(ct,filename))
 
-    """Read data in numpy array"""    
+    """Read data in numpy array"""
     csvreader=csv.reader(open(filename,'r'))
     data=np.ndarray(shape=(numrows,ncols), dtype=object)
     ct=0
@@ -171,31 +171,31 @@ def getcsvData(filename,_attr=False):
         elif len(row)!=0:
             data[k,:]=np.array(row,dtype=str)
             k+=1
-    return data,attributes 
+    return data,attributes
 
-    
 
+
+## @brief Main function for training a naive bayesian network using unlabeled data by EM method
+#
+# @b     Outputs:
+#        If particular output directory is provided after -o option, all the output files would be stored there. Or ele by default they will be stored in outputs/ directory in the current directory of this scripts
+#        After running, we will get 4 output files. They are named in the following fashion:
+#
+#        log_nbem_ix_rx_nx.csv
+#        score_nbem_ix_rx_nx_kx.csv
+#        test_nbem_hu_ix_rx_nx_kx.csv
+#        test_nbem_ix_rx_nx_kx.csv (where the x represents user input option value, i.e. i ==> initial Method; r ==> restarts number; n==> max number of iteration during one iteration. If -t option is triggered, all these filenames will have a timestamp suffix in addition)
+#        'log_nbem_ix_rx_nx.csv' consists info with the evolution of score during each EM round.
+#        'score_nbem_ix_rx_nx_kx.csv' contains final evaluated score of current model and the final parameter configuration.
+#        'test_nbem_hu_ix_rx_nx_kx.csv' is simply the original csv file plus predicted class attribute by the model
+#        'test_nbem_hu_ix_rx_nx_kx.csv' is index based version of 'test_nbem_hu_ix_rx_nx_kx'. In this file the value of each feature is in numerated fashion
+#
+#
 def main():
-    """Main function for training a naive bayesian network using unlabeled data by EM method
 
-    Outputs:
-        If particular output directory is provided after -o option, all the output files would be stored there. Or ele by default they will be stored in outputs/ directory in the current directory of this scripts 
-        After running, we will get 4 output files. They are named in the following fashion: 
+    args=argParse()
 
-        log_nbem_ix_rx_nx.csv
-        score_nbem_ix_rx_nx_kx.csv
-        test_nbem_hu_ix_rx_nx_kx.csv
-        test_nbem_ix_rx_nx_kx.csv (where the x represents user input option value, i.e. i ==> initial Method; r ==> restarts number; n==> max number of iteration during one iteration. If -t option is triggered, all these filenames will have a timestamp suffix in addition) 
-        'log_nbem_ix_rx_nx.csv' consists info with the evolution of score during each EM round.
-        'score_nbem_ix_rx_nx_kx.csv' contains final evaluated score of current model and the final parameter configuration.
-        'test_nbem_hu_ix_rx_nx_kx.csv' is simply the original csv file plus predicted class attribute by the model 
-        'test_nbem_hu_ix_rx_nx_kx.csv' is index based version of 'test_nbem_hu_ix_rx_nx_kx'. In this file the value of each feature is in numerated fashion
-     
-    """
-
-    args=argParse() 
-   
-    """Initialize training data""" 
+    """Initialize training data"""
     traindata,attributes = getcsvData(args.datafilename,args._attr)
 
     """
@@ -206,8 +206,8 @@ def main():
     nbem.setOutput(args.outputdir)
 
     """
-    Preprocessing original raw data. 
-    This preprocessing includes: 1)transformation original raw data into index based data;2) binarization of returned index based data.  
+    Preprocessing original raw data.
+    This preprocessing includes: 1)transformation original raw data into index based data;2) binarization of returned index based data.
     For example, if the raw data is (array([[2, 2],
                                             [2, 3]])
     After transformation step 1), we got (array([[0 0],
@@ -232,7 +232,7 @@ def main():
     For details please refer to naive_bayes_EM's documentation
     """
     nbem.build(args.numc,xdata_ml,args.itersn,args.itercn,args.initMethod,args._timestamp)
-    
+
     """
     Test the model with original training data.
     """
@@ -240,6 +240,6 @@ def main():
         nbem.testModel(xdata_ml,ydata,args._timestamp)
     else:
         nbem.testModel(xdata_ml,timestamp=args._timestamp)
-            
+
 if __name__=='__main__':
     main()
