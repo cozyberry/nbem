@@ -111,10 +111,10 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
     Transform multi-value xdata to binary representation of xdata_ml.
     For example, for a feature with 4 possible value: bad,good,vgood, the binary representation of a value 'bad' or 'good' or 'vgood' would be [1,0,0],[0,1,0] or [0,0,1] respectively
     """
-    def fit_transformRaw(self,data,_labeled=True,arrayAttr=None):
+    def fit_transformRaw(self,data,_labeled=True,arrayAttr=[]):
         self._labeled=_labeled
 
-        if arrayAttr != None:
+        if len(arrayAttr)!=0:
             self.featnames = np.array(arrayAttr,str)
         else:
             nfeat = np.size(data,1)
@@ -133,7 +133,7 @@ class BaseMultinomialNBEM(naive_bayes.MultinomialNB):
 
         # convert string objects to integer values for modeling:
         for k in range(np.size(data,1)):
-         keys[k],garbage,numdata[:,k] = np.unique(data[:,k],True,True)
+            keys[k],garbage,numdata[:,k] = np.unique(data[:,k],True,True)
 
         numrows = np.size(numdata,0); # number of instances in car data set
 
@@ -618,7 +618,6 @@ class MultinomialNBEM(BaseMultinomialNBEM):
             print "Bayes smoothing..."
 
         print "Best one is at %dth iteration"%best_iter
-        print "The corresponding log_prob: ", bestlog_prob
 
         if self.outputDir:
             print >>log,"Best one is at %dth iteration"%best_iter
@@ -725,7 +724,7 @@ class MultinomialNBEM(BaseMultinomialNBEM):
         logP_D1_M = self.complete_model_ML()
         logP_D1_theta_M = self.complete_param_ML()
         logP_D_theta_M = self.calcObj(xtest,obj='ML')
-        print "%d ncluster: %f %f"%(self.n_cluster,logP_D1_theta_M,logP_D_theta_M)
+        #print "%d ncluster: %f %f"%(self.n_cluster,logP_D1_theta_M,logP_D_theta_M)
         #pprint.pprint(locals())
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 

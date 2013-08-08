@@ -1,0 +1,4 @@
+NO_Class,NO_Trial,NO_ITER,LL,DIFF_LL,DIFF_CPT,YET_CUR_BEST_LL,Comments
+1,1,50,-6994.231483,10000.000000,-inf,Better LL and NO Conflict
+Best one is at 0th iteration
+The corresponding log_prob:  -6994.23148308

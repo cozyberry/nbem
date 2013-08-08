@@ -10,7 +10,6 @@ def multibetaln(x):
     gammalnx=special.gammaln(x)
     sumx=np.sum(x)
     gammalnsumx=special.gammaln(sumx)
-    pprint(locals())
     return np.sum(gammalnx)-gammalnsumx
 
 """

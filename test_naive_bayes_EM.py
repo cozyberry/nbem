@@ -118,6 +118,9 @@ def main(argv):
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
             nbem.setOutput(outputdir)
+        else:
+            nbem.setOutput(OUTPUTDIR)
+
         if _labeled:
             if _attr:
                 xdata_ml,ydata=nbem.fit_transformRaw(rdata,True,ATTRIBUTES)
