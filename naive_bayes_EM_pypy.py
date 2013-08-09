@@ -1,17 +1,18 @@
 #! /usr/bin/python
-## @package naive_bayes_EM
-#  naive_bayes implements training of a Naive Bayes Network from unlabeled data. I use class structure of naive_bayes.BaseDiscreteNB which offers a quite good way of how to store the paremeter configuration of a naive bayes net. From this structure naive_bayes_EM itself implements a CategoricalNB class in which all the nodes follow a Categorical distribution and a CategoricalNBEM class which uses EM method to learn MAP parameter configuration. Details of implemenation are given in CategoricalNBEM.build() function.
-#
-#  The basic idea of training is that: given a dataset \f${\mathbf{X_1},\mathbf{X_2},...,\mathbf{X_N}}\f$ where N is the number of samples and each  we would like to train a naive bayes network. And \f$ \mathbf{X_r} = {x_1,x_2,..,x_n}\f$where n is the number of features. Given a particular number of cluster k, our engine aimes at finding a MAP parameter configuration \f$ \theta_{MAP}  = argmax_{\theta}P(\theta|D,m)\f$, where \f$m\f$ refers to the structure of segmentation mode, more precisely, a naive bayesian network with latent class node as the root having k number of possible clustering result. For more detailed mathematical introduction of model specification, please refer to my report as well as these papers Cheeseman1995 @cite acsbayesian Chickering1997 @cite chickering1997efficient and Friedman1997@cite friedman1997bayesian
-#
-#  @note  The reason why I did not use the MultinomialNB directly is that the MultinomialNB supposes that each feature follows a multinomial distribution, in our training task, each feature follows a categorical distibution. This means for for feature \f$x_i\f$ which has \f$r_i \f$ possible state of value, \f$ {P(x_i=v_j|c) = p_j, j\in {1,2,...,r_i}}\f$ . However Categorical distribution is just the generization of Bernoulli distribution. So it is quite natual to reuse BaseDiscreteNB for my class.
-#
-#  @warning The difference between multinomial distribution and categorical distribution determines how we should preprocessing the given data. The original implementation of naive_bayes.MultinomialNB is specially used for text classification. In the source code MultinomialNB did binarization for label data(y), not for feature data(xdata). Forcategorical distribution we should be both binarization operation for xdata as well as for y. Please see CategoricalNB.fit_transformRaw() function for details of implementation.
-#
-#  @remark
-#  Please go to http://scikit-learn.org/stable/modules/naive_bayes.html for detailed information on used naive_bayes models.
-#  And http://thinkmodelcode.blogspot.fr/2013/04/naive-bayes-classification-using-python.html for an example of classification task. The classification task is more simple since it does not require EM method.
-#
+"""@package naive_bayes_EM
+naive_bayes implements training of a Naive Bayes Network from unlabeled data. I use class structure of naive_bayes.BaseDiscreteNB which offers a quite good way of how to store the paremeter configuration of a naive bayes net. From this structure naive_bayes_EM itself implements a CategoricalNB class in which all the nodes follow a Categorical distribution and a CategoricalNBEM class which uses EM method to learn MAP parameter configuration. Details of implemenation are given in CategoricalNBEM.build() function. 
+
+The basic idea of training is that: given a dataset \f${\mathbf{X_1},\mathbf{X_2},...,\mathbf{X_N}}\f$ where N is the number of samples and each  we would like to train a naive bayes network. And \f$ \mathbf{X_r} = {x_1,x_2,..,x_n}\f$where n is the number of features. Given a particular number of cluster k, our engine aimes at finding a MAP parameter configuration \f$ \theta_{MAP}  = argmax_{\theta}P(\theta|D,m)\f$, where \f$m\f$ refers to the structure of segmentation mode, more precisely, a naive bayesian network with latent class node as the root having k number of possible clustering result. For more detailed mathematical introduction of model specification, please refer to my report as well as these papers Cheeseman1995 @cite acsbayesian Chickering1997 @cite chickering1997efficient and Friedman1997@cite friedman1997bayesian 
+
+@note  The reason why I did not use the MultinomialNB directly is that the MultinomialNB supposes that each feature follows a multinomial distribution, in our training task, each feature follows a categorical distibution. This means for for feature \f$x_i\f$ which has \f$r_i \f$ possible state of value, \f$ {P(x_i=v_j|c) = p_j, j\in {1,2,...,r_i}}\f$ . However Categorical distribution is just the generization of Bernoulli distribution. So it is quite natual to reuse BaseDiscreteNB for my class.
+
+@warning The difference between multinomial distribution and categorical distribution determines how we should preprocessing the given data. The original implementation of naive_bayes.MultinomialNB is specially used for text classification. In the source code MultinomialNB did binarization for label data(y), not for feature data(xdata). Forcategorical distribution we should be both binarization operation for xdata as well as for y. Please see CategoricalNB.fit_transformRaw() function for details of implementation.
+
+@remark
+Please go to http://scikit-learn.org/stable/modules/naive_bayes.html for detailed information on used naive_bayes models. 
+And http://thinkmodelcode.blogspot.fr/2013/04/naive-bayes-classification-using-python.html for an example of classification task. The classification task is more simple since it does not require EM method.
+
+"""
 
 from sklearn.preprocessing import LabelBinarizer
 from sklearn import naive_bayes
@@ -29,113 +30,113 @@ import copy
 import pprint
 from scipy import special
 
-## @brief     a Multinomial Naive Bayes Cluster which combines [naive bayes classifier implementation] and [EM or ECM method] to deal with missing label information.
-#
-#    The Multinomial Naive Bayes Cluster is suitable for clustering with
-#    discrete features (e.g., word counts for text classification).
-#
-#    The Multinomial Naive Bayes Cluster can accept data without or with label information.
-#    But the label information would only be used as informative guides
-#    For one naive bayes network \f$m\f$, each local distribution function \f$p(x_i|\mathbf{pa_i},\mathbf{\theta_m},\mathbf{m})\f$ is consists a set of categorical distribution. That is for each \f$i,j\f$
-#    Parameters
-#    ----------
-# 	alpha	float, optional (default=1.0)
-#        Additive (Laplace/Lidstone) smoothing parameter
-#        (0 for no smoothing).
-#
-# 	fit_prior	boolean
-#        Whether to learn class prior probabilities or not.
-#        If false, a uniform prior will be used.
-#
-# 	class_prior	array-like, size=[n_classes,]
-#        Prior probabilities of the classes. If specified the priors are not
-#        adjusted according to the data.
-#
-# 	iterSN	iteration number for EM
-# 	iterCN	retrial number for EM
-#
-#    Attributes
-#    ----------
-#
-# 	n_cluster	initial maximum number of cluster
-#
-# 	local_prob_table	local probability table for each feature node. shape=[n_classes,n_features]
-#
-# 	featIndex	an internal array index for multi-value features. shape=[sum of domain length of each feature]
-#
-# 	nfeatures	an internal array of domain length of each multi-value feature shape=[feature number+1]
-#
-#    `intercept_`, `class_log_prior_` : array, shape = [n_classes]
-#        Smoothed empirical log probability for each class.
-#
-#    `feature_log_prob_`, `coef_` : array, shape = [n_classes, n_features]
-#        Empirical log probability of features
-#        given a class, P(x_i|y).
-#
-#        (`intercept_` and `coef_` are properties
-#        referring to `class_log_prior_` and
-#        `feature_log_prob_`, respectively.)
-#
-#    Examples
-#    --------
-#    To be modified
-#    >>> import numpy as np
-#    >>> X = np.random.randint(5, size=(6, 100))
-#    >>> Y = np.array([1, 2, 3, 4, 5, 6])
-#    >>> from sklearn.naive_bayes import MultinomialNB
-#    >>> clf = MultinomialNB()
-#    >>> clf.fit(X, Y)
-#    MultinomialNB(alpha=1.0, class_prior=None, fit_prior=True)
-#    >>> print(clf.predict(X[2]))
-#    [3]
-#
-#    Notes
-#    -----
-#    To be modified
-#    For the rationale behind the names `coef_` and `intercept_`, i.e.
-#    naive Bayes as a linear classifier, see J. Rennie et al. (2003),
-#    Tackling the poor assumptions of naive Bayes text classifiers, ICML.
-#
 class CategoricalNB(naive_bayes.BaseDiscreteNB):
+    """
+    a Multinomial Naive Bayes Cluster which combines [naive bayes classifier implementation] and [EM or ECM method] to deal with missing label information. 
+
+    The Multinomial Naive Bayes Cluster is suitable for clustering with
+    discrete features (e.g., word counts for text classification). 
+
+    The Multinomial Naive Bayes Cluster can accept data without or with label information. 
+    But the label information would only be used as informative guides
+    For one naive bayes network \f$m\f$, each local distribution function \f$p(x_i|\mathbf{pa_i},\mathbf{\theta_m},\mathbf{m})\f$ is consists a set of categorical distribution. That is for each \f$i,j\f$ 
+    Parameters
+    ----------
+    alpha : float, optional (default=1.0)
+        Additive (Laplace/Lidstone) smoothing parameter
+        (0 for no smoothing).
+
+    fit_prior : boolean
+        Whether to learn class prior probabilities or not.
+        If false, a uniform prior will be used.
+
+    class_prior : array-like, size=[n_classes,]
+        Prior probabilities of the classes. If specified the priors are not
+        adjusted according to the data.
+
+    iterSN : iteration number for EM
+    iterCN : retrial number for EM
+
+    Attributes
+    ----------
+
+    n_cluster: initial maximum number of cluster
+
+    local_prob_table: local probability table for each feature node. shape=[n_classes,n_features]
+
+    featIndex: an internal array index for multi-value features. shape=[sum of domain length of each feature]
+
+    nfeatures: an internal array of domain length of each multi-value feature shape=[feature number+1]
+
+    `intercept_`, `class_log_prior_` : array, shape = [n_classes]
+        Smoothed empirical log probability for each class.
+
+    `feature_log_prob_`, `coef_` : array, shape = [n_classes, n_features]
+        Empirical log probability of features
+        given a class, P(x_i|y).
+
+        (`intercept_` and `coef_` are properties
+        referring to `class_log_prior_` and
+        `feature_log_prob_`, respectively.)
+
+    Examples
+    --------
+    To be modified
+    >>> import numpy as np
+    >>> X = np.random.randint(5, size=(6, 100))
+    >>> Y = np.array([1, 2, 3, 4, 5, 6])
+    >>> from sklearn.naive_bayes import MultinomialNB
+    >>> clf = MultinomialNB()
+    >>> clf.fit(X, Y)
+    MultinomialNB(alpha=1.0, class_prior=None, fit_prior=True)
+    >>> print(clf.predict(X[2]))
+    [3]
+
+    Notes
+    -----
+    To be modified
+    For the rationale behind the names `coef_` and `intercept_`, i.e.
+    naive Bayes as a linear classifier, see J. Rennie et al. (2003),
+    Tackling the poor assumptions of naive Bayes text classifiers, ICML.
+    """
 
 
-
-    ## @brief Constructor of CategoricalNB class
-    #
-    # @param		alpha	float, optional, default=1.0
-    #                Parameter in the Dirichelet prior distribution of all the parameters. In bayesian statistique, we have prior distribution for parameters. A general Dirichlet distribution looks like this: \f$f(x_1,\dots, x_{K-1}; \alpha_1,\dots, \alpha_K) = \frac{1}{\mathrm{B}(\alpha)} \prod_{i=1}^K x_i^{\alpha_i - 1}\f$ for all \f$x_1,\dots,x_{K} > 0 \f$ satisfying \f$x_1 + \dots + x_{K} = 1 \f$. Here we use a symmetric Dirichlet distribution, where all of the elements making up the parameter vector \f$\alpha\f$ have the same value "alpha" in the input parameter lists. Intuitively a given \f$\alpha\f$ vector means adding \f$\alpha_i\f$ imaginary occurrences of event \f$x_i\f$. The reason why we choose Dirichelet distribution is because it is the conjugate prior of Categorical distribution and Multinomial Distribution.
-    # @param		fit_prior	boolean, optional, default=True
-    #                Whether to learn class prior probabilities or not.
-    #                If false, a uniform prior will be used.
-    # @param		class_prior	array-like, size=[n_classes,],default=None
-    #                Prior probabilities of the classes. If specified the priors are not
-    #                adjusted according to the data.
-    #
-    #        @see http://en.wikipedia.org/wiki/Dirichlet_distribution for details of Dirichelet distribution. And Friedman1997@cite friedman1997bayesian for details of prior distribution and why we choose dirichelet distribution as the prior.
-    #
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
+        """Constructor of CategoricalNB class
+        Args:
+            alpha: float, optional, default=1.0
+                Parameter in the Dirichelet prior distribution of all the parameters. In bayesian statistique, we have prior distribution for parameters. A general Dirichlet distribution looks like this: \f$f(x_1,\dots, x_{K-1}; \alpha_1,\dots, \alpha_K) = \frac{1}{\mathrm{B}(\alpha)} \prod_{i=1}^K x_i^{\alpha_i - 1}\f$ for all \f$x_1,\dots,x_{K} > 0 \f$ satisfying \f$x_1 + \dots + x_{K} = 1 \f$. Here we use a symmetric Dirichlet distribution, where all of the elements making up the parameter vector \f$\alpha\f$ have the same value "alpha" in the input parameter lists. Intuitively a given \f$\alpha\f$ vector means adding \f$\alpha_i\f$ imaginary occurrences of event \f$x_i\f$. The reason why we choose Dirichelet distribution is because it is the conjugate prior of Categorical distribution and Multinomial Distribution.
+            fit_prior: boolean, optional, default=True
+                Whether to learn class prior probabilities or not.
+                If false, a uniform prior will be used.
+            class_prior: array-like, size=[n_classes,],default=None
+                Prior probabilities of the classes. If specified the priors are not
+                adjusted according to the data.
+
+        @see http://en.wikipedia.org/wiki/Dirichlet_distribution for details of Dirichelet distribution. And Friedman1997@cite friedman1997bayesian for details of prior distribution and why we choose dirichelet distribution as the prior. 
+        """
         self.alpha = alpha
         self.fit_prior = fit_prior
         self.class_prior = class_prior
         self._verbose = False
-        self.outputDir = None
+        self.outputDir = None 
 
         if fit_prior == True and class_prior:
             """Confilicts of given arguments"""
             print "Warning: the fit_prior and class_prior are both set. We will use the assigned class_prior and the fit_prior will be ignored"
 
-    ## @brief set verbose mode by the input argument
     def setVerbose(self,verbose):
+        """set verbose mode by the input argument"""
         self._verbose = verbose
 
-    ## @brief set output directory for engine outputs
     def setOutput(self,outputdir):
+        """set output directory for engine outputs"""
         if (not os.path.exists(outputdir)) or (not os.path.isdir(outputdir)):
-            raise ValueError("The output directory is invalide %s"%outputdir)
-            return False
-        self.outputDir = outputdir
+            raise ValueError("The output directory is invalide %s"%outputdir) 
+            return False 
+        self.outputDir = outputdir 
 
-
+        
 
 
     """
@@ -152,14 +153,14 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
         else:
             nfeat = np.size(data,1)
             if _labeled:
-                nfeat -= 1
+                nfeat -= 1 
             if nfeat < 1:
                 raise ValueError("The feature number is invalid! It should be at least at One")
             tmp = []
             for i in range(0,nfeat):
                 tmp.append('feature_%d'%i)
 
-            self.featnames = np.array(tmp,str)
+            self.featnames = np.array(tmp,str)  
 
         keys = [[]]*np.size(data,1)
         numdata = -1*np.ones_like(data);
@@ -192,7 +193,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
                     xdata_ml = 1-xdata_ml
                     self.unique_feats.append(self.nfeatures[-1])
                 self.featIndex = lbin.classes_
-
+                    
                 self.nfeatures.append(len(lbin.classes_))
             else:
                 cur_xdata_ml=lbin.fit_transform(xdata[:,k])
@@ -204,7 +205,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
                 xdata_ml = np.hstack((xdata_ml,cur_xdata_ml))
                 self.featIndex= np.hstack((self.featIndex,lbin.classes_))
                 self.nfeatures.append(self.nfeatures[-1]+len(lbin.classes_))
-
+    
         #print self.unique_feats
         if _labeled:
             return xdata_ml,ydata
@@ -269,7 +270,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
 
 
 
-
+        
 
     """
     This is very delicate
@@ -281,7 +282,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
             xdata_nz = (xdata_ml == 1)
             for j in self.unique_feats:
                 xdata_nz[:,j]=True
-
+            
             res = np.extract(xdata_nz,featIndex_t).reshape(numrows,-1)
             return res
         else:
@@ -294,10 +295,10 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
 
     """
     Parameters:
-        jll:
+        jll: 
             type: numpy array; shape: [nclass_,nbinaryfeature_]
         featArray:
-            type: list; format: for each row of jll, item indexes from featArray[i] to featArray[i+1](exclusive) is
+            type: list; format: for each row of jll, item indexes from featArray[i] to featArray[i+1](exclusive) is 
             the binary result of fiture i
     Return:
         LCT table:
@@ -311,7 +312,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
         nFeature=np.size(jll,1)
 
         ori_nFeature=len(featArray)-1
-        if self._verbose:
+        if self._verbose:    
             print "nFeature: %d; nClass: %d; ori_nFeature: %d"%(nFeature,nClass,ori_nFeature)
         if ori_nFeature < 1 or nFeature != featArray[-1]:
             raise ValueError("the dimension of given jll: %d * %d is inconsistent with info of featArray: %s!"%(nClass, nFeature,str(featArray)))
@@ -348,7 +349,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
                     frac = self.cpt[k,i,j]
                     title+=",%f"%frac
                 print >>out,title
-            print >> out,""
+            print >> out,"" 
 
     def get_filename(self,prefix,timestamp=True):
 
@@ -445,7 +446,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
 
 
             print >> out,onerow
-            print >> out_hu,onerow_hu
+            print >> out_hu,onerow_hu 
 
         out.close()
         print >>out_hu,""
@@ -465,9 +466,9 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
             self.printStats(dist,out_hu)
         out_hu.close()
 
-
+    
     def printStats(self,dist,out=None):
-
+        
         if out==None:
             out=sys.stdout
 
@@ -481,7 +482,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
         numc = len(ykeys)
         for i in range (0,numc):
             print >>out, "%s ==> class %d"%(ykeys[i],i)
-
+        
         curnumc = np.size(lct,0)
 
         print >>out,""
@@ -499,7 +500,7 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
 
         print >>out,""
 
-
+    
 
 class CategoricalNBEM(CategoricalNB):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None):
@@ -536,16 +537,16 @@ class CategoricalNBEM(CategoricalNB):
             else:
                 logname="%s_i%d_r%d_n%d_k%d.csv"%(prefix,self.init,self.iterSN,self.iterCN,self.n_cluster)
 
-            log=open(os.path.join(self.outputDir,logname),'w')
+            log=open(os.path.join(self.outputDir,logname),'w')    
             print >>log,"NO_Class,NO_Trial,NO_ITER,LL,DIFF_LL,DIFF_CPT,YET_CUR_BEST_LL,Comments"
 
-        bestlog_prob = -float('inf')
+        bestlog_prob = -float('inf') 
         best_iter = 0
-        best_class_prior = None
+        best_class_prior = None 
         best_feature_log_prob = None
         classes_backup = None
         if numc == 1:
-            self.iterSN = 1
+            self.iterSN = 1 
 
         for j in range(0,self.iterSN):
             if numc == 1:
@@ -553,7 +554,7 @@ class CategoricalNBEM(CategoricalNB):
                 sigma_yx=np.ones((numrows,1),float)
                 q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
                 q = np.sum(q_y)
-                q_y = np.divide(q_y,q)
+                q_y = np.divide(q_y,q) 
                 self.class_log_prior_=np.log(q_y)
                 ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha#-1
                 ncxsum=np.sum(ncx,axis=1)
@@ -598,10 +599,10 @@ class CategoricalNBEM(CategoricalNB):
                 diff=LA.norm(diff_sig)
                 old_sigma_yx=sigma_yx
             #M-step
-                #q_y=np.sum(sigma_yx,axis=0)/numrows
+                #q_y=np.sum(sigma_yx,axis=0)/numrows 
                 q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
                 q = np.sum(q_y)
-                q_y = np.divide(q_y,q)
+                q_y = np.divide(q_y,q) 
                 self.class_log_prior_=np.log(q_y)
 
                 #alpha is very import to smooth. or else in log when the proba is too small we got -inf
@@ -639,7 +640,7 @@ class CategoricalNBEM(CategoricalNB):
                 best_feature_log_prob=copy.deepcopy(self.feature_log_prob_)
                 classes_backup = copy.deepcopy(self.classes_)
 
-
+                        
 
         self.class_log_prior_=copy.deepcopy(best_class_log_prior)
         self.feature_log_prob_=copy.deepcopy(best_feature_log_prob)
@@ -722,13 +723,14 @@ class CategoricalNBEM(CategoricalNB):
         print self.expect_nclass_feature
         """
 
-    ## Calculate the prior probability of one parameter configuration,\f$\mathbf{\theta_{m}}\f$.
-    #
-    #  As we explained in CategoricalNB, we have a collection of parameter set \f$\mathbf{\theta_{ij}}\f$ representing the distribution of node \f$i\f$'values when its parent takes value \f$j\f$. we have \f$\mathbf{\theta_{ij}} = \biggl(\theta_{ij2},\dots,\theta_{ijr_i}\biggr)\f$ and \f$ \sum_{k=1}^{r_i}{\theta_{ijk}} = 1, \theta_{ijk} > 0 \f$. In our model we use symmetric Dirichelet distribution as \f$ \mathbf{\theta_{ij}} \f$ 's prior distribution
-    #
-    #  Equation of prior probability of one parameter configuration, \f$ \mathbf{\theta_{m}}\f$: \f{eqnarray}{p(\mathbf{\theta_{m}}|\mathbf{m})=\prod_{i=1}^{n}{\prod_{j=1}^{q_i}{p(\mathbf{\theta_{ij}}|\mathbf{m})=}}\f}
-    #
-    def complete_model_ML(self):
+    def complete_model_AP(self):
+        """Calculate the prior probability of one parameter configuration,\f$\mathbf{\theta_{m}}\f$.
+            
+        As we explained in CategoricalNB, we have a collection of parameter set \f$\mathbf{\theta_{ij}}\f$ representing the distribution of node \f$i\f$'values when its parent takes value \f$j\f$. we have \f$\mathbf{\theta_{ij}} = \biggl(\theta_{ij2},\dots,\theta_{ijr_i}\biggr)\f$ and \f$ \sum_{k=1}^{r_i}{\theta_{ijk}} = 1, \theta_{ijk} > 0 \f$. In our model we use symmetric Dirichelet distribution as \f$ \mathbf{\theta_{ij}} \f$ 's prior distribution 
+
+        Equation of prior probability of one parameter configuration, \f$ \mathbf{\theta_{m}}\f$:\f{eqnarray}{p(\mathbf{\theta_{m}}|\mathbf{m})=\prod_{i=1}^{n}{\prod_{j=1}^{q_i}{p(\mathbf{\theta_{ij}}|\mathbf{m})=}}\f}
+
+        """
         gamma_nclass=special.gammaln(self.expect_nclass+self.alpha)
         gamma_nclass_feature=special.gammaln(self.expect_nclass_feature+self.alpha)
         gamma_sum_nclass=special.gammaln(np.sum(self.expect_nclass+self.alpha))
@@ -738,7 +740,7 @@ class CategoricalNBEM(CategoricalNB):
             if i==0:
                 gamma_sum_nclass_feature=cur_gamma_sum_nclass_feature
             else:
-                gamma_sum_nclass_feature=np.hstack((gamma_sum_nclass_feature,cur_gamma_sum_nclass_feature))
+                gamma_sum_nclass_feature=np.hstack((gamma_sum_nclass_feature,cur_gamma_sum_nclass_feature)) 
 
         #pprint.pprint(locals())
         nparams=self.n_cluster+self.n_cluster*(self.nfeatures[-1])
@@ -749,16 +751,20 @@ class CategoricalNBEM(CategoricalNB):
 
         return np.sum(gamma_nclass_feature)+np.sum(gamma_nclass)-np.sum(gamma_sum_nclass_feature)-gamma_sum_nclass+gamma_sum_alpha-nparams*special.gammaln(self.alpha)
 
-    ## @brief Calculate Marginal likelihood of the data when the data is completed given the model and the parameter. We use the sufficient statistics corresponding to the given MAP parameter configuration.
-    #
-    #  Equation of logarithm of Marginal Likelihood:\f{eqnarray}{
-    #\log{p(D|m)} &=& \log{\prod_{i=1}^{n}{\prod_{j=1}^{q_i}{\biggl(\frac{\Gamma(\alpha_{ij})}{\Gamma(\alpha_{ij}+N_{ij})}\prod_{k=1}^{r_i}{\frac{\Gamma(\alpha_{ijk}+N_{ijk})}{\Gamma(\alpha_{ijk})}}\Biggr)}}}\\
-    #&=& \sum_{i=1}^{n}{\sum_{j=1}^{q_i}{\Biggl(\log{\frac{\Gamma(\alpha_{ij})}{\Gamma(\alpha_{ij}+N_{ij})}}+\sum_{k=1}^{r_i}{\log{\frac{\Gamma(\alpha_{ijk}+N_{ijk})}{\Gamma(\alpha_{ijk})}}}\Biggr)}}\f}
-    #  Here since we use a symmetric Dirichlet distribution, we have \f$ \alpha_{ijk} = \alpha \f$ for all \f$i,j,k\f$ and \f$\alpha_{ij} = \sum_{k=1}^{r_i}{\alpha_{ijk}} \f$. And the collection of \f$N_{ijk}\f$ are sufficient statistics of the data for the model \f$m\f$. \f$N_{ij} = \sum_{k=1}^{r_i}{N_{ijk}}\f$.In EM process we use the expected value of these sufficient statistics during this calculation. Please go to CategoricalNBEM.build() for more details.@see Chickering197@cite chickering1997efficient for details of formule deduction.
-    #  @return \f$\log{p(D|m)}\f$
-    #  @note the sufficient statistics require label information as well, here what we use is in fact the expectations of sufficient statistics. 
-    #
     def complete_param_ML(self):
+        """Calculate Marginal likelihood of the data when the data is completed, which means that when the sufficient statistics for the class label information is also available.
+
+        Equation of logarithm of Marginal Likelihood:\f{eqnarray}{
+\log{p(D|m)} &=& \log{\prod_{i=1}^{n}{\prod_{j=1}^{q_i}{\biggl(\frac{\Gamma(\alpha_{ij})}{\Gamma(\alpha_{ij}+N_{ij})}\prod_{k=1}^{r_i}{\frac{\Gamma(\alpha_{ijk}+N_{ijk})}{\Gamma(\alpha_{ijk})}}\Biggr)}}}\\
+&=& \sum_{i=1}^{n}{\sum_{j=1}^{q_i}{\Biggl(\log{\frac{\Gamma(\alpha_{ij})}{\Gamma(\alpha_{ij}+N_{ij})}}+\sum_{k=1}^{r_i}{\log{\frac{\Gamma(\alpha_{ijk}+N_{ijk})}{\Gamma(\alpha_{ijk})}}}\Biggr)}}\f} 
+
+        Here since we use a symmetric Dirichlet distribution, we have \f$ \alpha_{ijk} = \alpha \f$ for all \f$i,j,k\f$ and \f$\alpha_{ij} = \sum_{k=1}^{r_i}{\alpha_{ijk}} \f$. And the collection of \f$N_{ijk}\f$ are sufficient statistics of the data for the model \f$m\f$. \f$N_{ij} = \sum_{k=1}^{r_i}{N_{ijk}}\f$.In EM process we use the expected value of these sufficient statistics during this calculation. Please go to CategoricalNBEM.build() for more details.
+        
+        @see Chickering197@cite chickering1997efficient for details of formule deduction.
+
+        Returns:
+            \f$\log{p(D|m)}\f$ 
+        """
         part1=np.multiply(self.expect_nclass,self.class_log_prior_)
         part2=np.multiply(self.expect_nclass_feature,self.feature_log_prob_)
         return np.sum(part1)+np.sum(part2)
@@ -766,26 +772,19 @@ class CategoricalNBEM(CategoricalNB):
 
 
 
-
-    ## @brief Calculate approximate marginal likelihood by cheeseman stutz method.This method is proposed initially in Cheeseman1985. Equation of CS_Score: \f{eqnarray}{ \log{p(D|m)} \approx \log{p(D^{'}|m)} - \log{p(D^{'}|\tilde{\phi}_m,m)} + \log{p(D|\tilde{\phi}_m,m)}\f} where \f$ D^{'}\f$ is the extended dataset, that is, the original data set \f$D\f$ plus label info. We use such an extended dataset that its sufficient statistcs equals to those used for MAP configuration \f$\theta_MAP\f$(Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient)
-    #
-    #  @param		xdata	data used to training the model.
-    #  @see Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient for details of formule deduction.
-    #
+    
     def cheeseman_stutz_score(self,xdata):
+        """Calculate approximate marginal likelihood by cheeseman stutz method.This method is proposed initially in Cheeseman1985. Equation of CS_Score: \f{eqnarray}{ \log{p(D|m)} \approx \log{p(D^{'}|m)} - \log{p(D^{'}|\tilde{\phi}_m,m)} + \log{p(D|\tilde{\phi}_m,m)}\f} where \f$ D^{'}\f$ is the extended dataset, that is, the original data set \f$D\f$ plus label info. We use such an extended dataset that its sufficient statistcs equals to those used for MAP configuration \f$\theta_MAP\f$(Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient)
 
-        ## Call CategoricalNBEM.get_sufficient_stats() to get expected sufficient statistics for MAP configuration \f$ \mathbf{\theta_{m}}: N_{ijk} \f$
+        Args:
+            xdata: data used to training the model.
+
+        @see Cheeseman1985@cite acsbayesian, Chickering197@cite chickering1997efficient for details of formule deduction.
+        """
         self.get_sufficient_stats(xdata)
-
-        ## Calculate \f$ \log{p(D^{'}|m)} \f$
-        logP_D1_M = self.complete_model_ML()
-
-        ## Calculate \f$\log{p(D^{'}|\tilde{\phi}_m,m)}\f$
+        logP_D1_M = self.complete_model_AP()
         logP_D1_theta_M = self.complete_param_ML()
-
-        ## Calculate \f$\log{p(D|\tilde{\phi}_m,m)}\f$
         logP_D_theta_M = self.calcObj(xtest,obj='ML')
-
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 
 
