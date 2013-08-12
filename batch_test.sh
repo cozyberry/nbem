@@ -33,7 +33,7 @@ while [ $i -le $1 ];
 do
     outputdir=${basename}/cluster_$i
     mkdir $outputdir
-    cmd="./test_naive_bayes_EM.py -i 1 -c 0 -n $n -s $s -k $i --alpha=2.0 -o ${outputdir} $2 > ${basename}/${basename}_log$i"
+    cmd="./test_naive_bayes_EM.py -i 1 -c 0 -n $n -r $s -k $i --alpha=2.0 -o ${outputdir} $2 > ${basename}/${basename}_log$i"
     echo $cmd
     eval $cmd
     if [ $i -eq 1 ];then
