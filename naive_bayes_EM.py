@@ -20,6 +20,7 @@ from sklearn import cluster
 import numpy as np
 from numpy import linalg as LA
 from sklearn.utils.extmath import safe_sparse_dot, logsumexp
+from sklearn.utils import array2d, atleast2d_or_csr
 import os,sys
 import string
 from time import localtime, strftime, time
@@ -28,6 +29,7 @@ import random
 import copy
 import pprint
 from scipy import special
+from scipy.sparse import issparse
 
 ## @brief     a Multinomial Naive Bayes Cluster which combines [naive bayes classifier implementation] and [EM or ECM method] to deal with missing label information.
 #
@@ -134,6 +136,22 @@ class CategoricalNB(naive_bayes.BaseDiscreteNB):
             raise ValueError("The output directory is invalide %s"%outputdir)
             return False
         self.outputDir = outputdir
+
+    def _count(self, X, Y):
+            """Count and smooth feature occurrences."""
+            if np.any((X.data if issparse(X) else X) < 0):
+                raise ValueError("Input X must be non-negative.")
+            N_c_i = safe_sparse_dot(Y.T, X) + self.alpha-1#
+            N_c = np.sum(N_c_i, axis=1)
+
+            return N_c, N_c_i
+
+    def _joint_log_likelihood(self, X):
+        """Calculate the posterior log probability of the samples X"""
+        X = atleast2d_or_csr(X)
+        return (safe_sparse_dot(X, self.feature_log_prob_.T)
+                + self.class_log_prior_)
+
 
 
 
@@ -551,11 +569,11 @@ class CategoricalNBEM(CategoricalNB):
             if numc == 1:
                 self.classes_=np.array([1],int)
                 sigma_yx=np.ones((numrows,1),float)
-                q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1#
                 q = np.sum(q_y)
                 q_y = np.divide(q_y,q)
                 self.class_log_prior_=np.log(q_y)
-                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha#-1
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1#
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
@@ -599,7 +617,7 @@ class CategoricalNBEM(CategoricalNB):
                 old_sigma_yx=sigma_yx
             #M-step
                 #q_y=np.sum(sigma_yx,axis=0)/numrows
-                q_y = np.sum(sigma_yx,axis=0)+self.alpha#-1
+                q_y = np.sum(sigma_yx,axis=0)+self.alpha-1#
                 q = np.sum(q_y)
                 q_y = np.divide(q_y,q)
                 self.class_log_prior_=np.log(q_y)
@@ -607,7 +625,7 @@ class CategoricalNBEM(CategoricalNB):
                 #alpha is very import to smooth. or else in log when the proba is too small we got -inf
                 #ncx = safe_sparse_dot(sigma_yx.T, xtrain)+mnb.alpha-1
                 ######MAP###########################################
-                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha#-1
+                ncx = safe_sparse_dot(sigma_yx.T, xtrain)+self.alpha-1#
                 ncxsum=np.sum(ncx,axis=1)
                 qxy=np.divide(ncx.T,ncxsum).T
                 self.feature_log_prob_=np.log(qxy)
@@ -698,7 +716,7 @@ class CategoricalNBEM(CategoricalNB):
             return log_prob
         elif obj == 'MAP':
             log_theta = np.sum(self.class_log_prior_)+np.sum(self.feature_log_prob_)
-            log_prob = log_prob+(self.alpha)*log_theta
+            log_prob = log_prob+(self.alpha-1)*log_theta#
             return log_prob
 
     def BIC(self,xtest):
@@ -784,7 +802,7 @@ class CategoricalNBEM(CategoricalNB):
         logP_D1_theta_M = self.complete_param_ML()
 
         ## Calculate \f$\log{p(D|\tilde{\phi}_m,m)}\f$
-        logP_D_theta_M = self.calcObj(xtest,obj='ML')
+        logP_D_theta_M = self.calcObj(xdata,obj='ML')
 
         return logP_D1_M-logP_D1_theta_M+logP_D_theta_M
 

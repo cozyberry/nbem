@@ -1,5 +1,5 @@
 #! /usr/bin/python
-"""Documentation of one example how we use MultinomialNBEM class to train naive bayesian network with unlabeled data. True label information can also be provided to offer more methods for validation of the model.
+"""Documentation of one example how we use CategoricalNBEM class to train naive bayesian network with unlabeled data. True label information can also be provided to offer more methods for validation of the model.
 @package test_nbem
 @author Wei HU
 @version 2.0
@@ -199,9 +199,9 @@ def main():
     traindata,attributes = getcsvData(args.datafilename,args._attr)
 
     """
-    Create a MultinomialNBEM object, which represents one bayesian network learned from unlabeled data
+    Create a CategoricalNBEM object, which represents one bayesian network learned from unlabeled data
     """
-    nbem=naive_bayes_EM.MultinomialNBEM(alpha=args.alpha)
+    nbem=naive_bayes_EM.CategoricalNBEM(alpha=args.alpha)
     nbem.setVerbose(args._verbose)
     nbem.setOutput(args.outputdir)
 

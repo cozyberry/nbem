@@ -114,7 +114,7 @@ def main(argv):
         writer = csv.writer(out_rdata)
         writer.writerows(rdata)
         out_rdata.close()
-        nbem=naive_bayes_EM.MultinomialNBEM(alpha=alpha)
+        nbem=naive_bayes_EM.CategoricalNBEM(alpha=alpha)
         nbem.setVerbose(_VERBOSE)
         if _OUTPUT:
             nbem.setOutput(outputdir)
