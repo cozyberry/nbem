@@ -700,7 +700,11 @@ class CategoricalNBEM(CategoricalNB):
             line+=",%f"%np.exp(self.class_log_prior_[i])
 
         print >>score_file,line
-
+        #ypredict = self.predict(xtrain)
+        #featArray = self.nfeatures
+        #nfeatArray=featArray-np.roll(featArray,1)
+        #maxnAttr=np.amax(nfeatArray[1:])
+        #dists=np.ndarray((len(self.nfeatures)-1,self.n_cluster,maxnAttr),int)
 
         score_file.close()
 
